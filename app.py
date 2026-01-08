@@ -94,7 +94,6 @@ async def copy_csv_with_pk_dedup(conn, table, columns, pk_columns, file_bytes):
 
     identity_cols = await get_identity_always_columns(conn, table, "public")
     has_identity_values = any(c in identity_cols for c in columns)
-    overriding = " OVERRIDING SYSTEM VALUE" if has_identity_values else ""
 
     async with conn.cursor() as cur:
         await cur.execute(f"""
@@ -104,9 +103,10 @@ async def copy_csv_with_pk_dedup(conn, table, columns, pk_columns, file_bytes):
         """)
 
         async with cur.copy(
-            f"COPY {temp_table} ({cols}) FROM STDIN WITH CSV HEADER{overriding}"
+            f"COPY {temp_table} ({cols}) FROM STDIN WITH CSV HEADER"
         ) as copy:
             await copy.write(file_bytes)
+
 
         await cur.execute(f"SELECT COUNT(*) FROM {temp_table}")
         total_rows = (await cur.fetchone())[0]
@@ -114,14 +114,14 @@ async def copy_csv_with_pk_dedup(conn, table, columns, pk_columns, file_bytes):
         if pk_columns:
             pk = ", ".join(pk_columns)
             await cur.execute(f"""
-                INSERT INTO {table} ({cols}){overriding}
+                INSERT INTO {table} ({cols}) OVERRIDING SYSTEM VALUE
                 SELECT {cols} FROM {temp_table}
                 ON CONFLICT ({pk}) DO NOTHING
                 RETURNING 1
             """)
         else:
             await cur.execute(f"""
-                INSERT INTO {table} ({cols}){overriding}
+                INSERT INTO {table} ({cols}) OVERRIDING SYSTEM VALUE
                 SELECT {cols} FROM {temp_table}
                 RETURNING 1
             """)
