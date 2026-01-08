@@ -2,6 +2,8 @@ from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, HTTPExcept
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg
 import json
+import csv
+import io
 import re
 import os
 import random
@@ -48,10 +50,39 @@ def generate_job_id():
     raise RuntimeError("Failed to generate unique job id")
 
 
+def get_csv_header_columns(file_bytes: bytes):
+    text = file_bytes.decode("utf-8-sig", errors="strict")
+    first_line = text.splitlines()[0] if text else ""
+    if not first_line.strip():
+        raise ValueError("CSV file is empty")
+    reader = csv.reader(io.StringIO(first_line))
+    header = next(reader, [])
+    cols = [c.strip() for c in header if c and c.strip()]
+    if not cols:
+        raise ValueError("CSV header is missing or empty")
+    return cols
+
+
 async def get_db_conn():
     if not DATABASE_URL:
         raise HTTPException(status_code=400, detail="Database not configured")
     return await psycopg.AsyncConnection.connect(DATABASE_URL)
+
+
+async def get_identity_always_columns(conn, table, schema="public"):
+    sql = """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = %s
+          AND table_schema = %s
+          AND is_identity = 'YES'
+          AND identity_generation = 'ALWAYS'
+    """
+
+    async with conn.cursor() as cur:
+        await cur.execute(sql, (table, schema))
+        rows = await cur.fetchall()
+    return {r[0] for r in rows}
 
 # ============================
 # Core DB Logic
@@ -59,8 +90,11 @@ async def get_db_conn():
 
 async def copy_csv_with_pk_dedup(conn, table, columns, pk_columns, file_bytes):
     cols = ", ".join(columns)
-    pk = ", ".join(pk_columns)
     temp_table = f"{table}_staging"
+
+    identity_cols = await get_identity_always_columns(conn, table, "public")
+    has_identity_values = any(c in identity_cols for c in columns)
+    overriding = " OVERRIDING SYSTEM VALUE" if has_identity_values else ""
 
     async with conn.cursor() as cur:
         await cur.execute(f"""
@@ -70,19 +104,27 @@ async def copy_csv_with_pk_dedup(conn, table, columns, pk_columns, file_bytes):
         """)
 
         async with cur.copy(
-            f"COPY {temp_table} ({cols}) FROM STDIN WITH CSV HEADER"
+            f"COPY {temp_table} ({cols}) FROM STDIN WITH CSV HEADER{overriding}"
         ) as copy:
             await copy.write(file_bytes)
 
         await cur.execute(f"SELECT COUNT(*) FROM {temp_table}")
         total_rows = (await cur.fetchone())[0]
 
-        await cur.execute(f"""
-            INSERT INTO {table} ({cols})
-            SELECT {cols} FROM {temp_table}
-            ON CONFLICT ({pk}) DO NOTHING
-            RETURNING 1
-        """)
+        if pk_columns:
+            pk = ", ".join(pk_columns)
+            await cur.execute(f"""
+                INSERT INTO {table} ({cols}){overriding}
+                SELECT {cols} FROM {temp_table}
+                ON CONFLICT ({pk}) DO NOTHING
+                RETURNING 1
+            """)
+        else:
+            await cur.execute(f"""
+                INSERT INTO {table} ({cols}){overriding}
+                SELECT {cols} FROM {temp_table}
+                RETURNING 1
+            """)
 
         inserted = cur.rowcount
 
@@ -92,15 +134,26 @@ async def copy_csv_with_pk_dedup(conn, table, columns, pk_columns, file_bytes):
 
 async def insert_json_with_pk_dedup(conn, table, columns, pk_columns, data):
     cols = ", ".join(columns)
-    pk = ", ".join(pk_columns)
     placeholders = ", ".join(["%s"] * len(columns))
 
-    sql = f"""
-        INSERT INTO {table} ({cols})
-        VALUES ({placeholders})
-        ON CONFLICT ({pk}) DO NOTHING
-        RETURNING 1
-    """
+    identity_cols = await get_identity_always_columns(conn, table, "public")
+    has_identity_values = any(c in identity_cols for c in columns)
+    overriding = " OVERRIDING SYSTEM VALUE" if has_identity_values else ""
+
+    if pk_columns:
+        pk = ", ".join(pk_columns)
+        sql = f"""
+            INSERT INTO {table} ({cols}){overriding}
+            VALUES ({placeholders})
+            ON CONFLICT ({pk}) DO NOTHING
+            RETURNING 1
+        """
+    else:
+        sql = f"""
+            INSERT INTO {table} ({cols}){overriding}
+            VALUES ({placeholders})
+            RETURNING 1
+        """
 
     rows = [tuple(obj[col] for col in columns) for obj in data]
 
@@ -160,8 +213,6 @@ async def create_table_from_sql(conn, create_sql: str):
 
 
 
-
-
 # ============================
 # Background Job
 # ============================
@@ -172,8 +223,18 @@ async def process_upload(job_id, table, columns, pk_columns, file_bytes, filenam
         conn = await get_db_conn()
 
         if filename.endswith(".csv"):
+            csv_columns = get_csv_header_columns(file_bytes)
+            requested = set(columns)
+            effective_columns = [c for c in csv_columns if c in requested]
+            if pk_columns:
+                missing_pk = [c for c in pk_columns if c not in effective_columns]
+                if missing_pk:
+                    raise ValueError(
+                        "CSV is missing primary key column(s): " + ", ".join(missing_pk)
+                    )
+
             total, inserted = await copy_csv_with_pk_dedup(
-                conn, table, columns, pk_columns, file_bytes
+                conn, table, effective_columns, pk_columns, file_bytes
             )
         elif filename.endswith(".json"):
             data = json.loads(file_bytes.decode("utf-8"))
@@ -228,6 +289,47 @@ async def upload_data(
     validate_identifiers([table])
     validate_identifiers(columns_list)
     validate_identifiers(pk_list)
+
+    if not columns_list:
+        raise HTTPException(status_code=400, detail="columns is required")
+
+    conn = None
+    try:
+        conn = await get_db_conn()
+        db_attributes, db_pk = await get_table_schema(conn, table, "public")
+    finally:
+        if conn:
+            await conn.close()
+
+    if not db_attributes:
+        raise HTTPException(status_code=404, detail="table not found")
+
+    db_attr_set = set(db_attributes)
+    bad_cols = [c for c in columns_list if c not in db_attr_set]
+    if bad_cols:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid column(s) for table: " + ", ".join(bad_cols)
+        )
+
+    # If primary_key is provided, enforce it matches the table PK.
+    # If empty, we allow inserts without deduplication (auto mode).
+    if pk_list:
+        if set(pk_list) != set(db_pk):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "primary_key does not match table primary key. "
+                    f"Expected: {', '.join(db_pk) if db_pk else 'None'}"
+                ),
+            )
+
+        missing_pk_in_cols = [c for c in pk_list if c not in columns_list]
+        if missing_pk_in_cols:
+            raise HTTPException(
+                status_code=400,
+                detail="primary_key must be included in columns: " + ", ".join(missing_pk_in_cols)
+            )
 
     file_bytes = await file.read()
     filename = file.filename.lower()
