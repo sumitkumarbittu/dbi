@@ -1700,17 +1700,22 @@
                 const box = document.createElement('div');
                 box.className = `api-box ${key === selectedApi ? 'selected' : ''}`;
                 box.textContent = key;
-                box.onclick = () => selectApi(key);
+                box.onclick = (e) => selectApi(key, e);
                 container.appendChild(box);
             });
         }
         
-        function selectApi(key) {
+        function selectApi(key, event) {
             selectedApi = key;
             document.querySelectorAll('.api-box').forEach(box => {
                 box.classList.remove('selected');
             });
-            event.target.classList.add('selected');
+            
+            // Get the clicked element from the event
+            const clickedElement = event ? event.currentTarget : document.querySelector(`.api-box:contains('${key}')`);
+            if (clickedElement) {
+                clickedElement.classList.add('selected');
+            }
             
             // Update the display text
             document.getElementById('renderUrlText').textContent = API_CONFIGS[key];
