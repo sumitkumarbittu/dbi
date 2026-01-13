@@ -538,6 +538,158 @@
             top: 0;
         }
 
+        .preview-table tr {
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .preview-table tr:hover {
+            background-color: #f3f4f6;
+        }
+
+        .preview-table tr.selected {
+            background-color: #eef2ff;
+            border-left: 3px solid #667eea;
+        }
+
+        .preview-table tr.selected:hover {
+            background-color: #e0e7ff;
+        }
+
+        .row-checkbox {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            cursor: pointer;
+        }
+
+        .selected-counter {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .job-cards-container {
+            margin-top: 20px;
+        }
+
+        .job-card {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            transition: transform 0.3s ease;
+            animation: slideInUp 0.4s ease;
+        }
+
+        .job-card:hover {
+            transform: translateY(-3px);
+        }
+
+        .job-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .job-card-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #1f2937;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .job-id-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        .job-card-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .job-status-processing {
+            color: #f59e0b;
+        }
+
+        .job-status-completed {
+            color: #10b981;
+        }
+
+        .job-status-failed {
+            color: #ef4444;
+        }
+
+        .job-progress-section {
+            margin-top: 15px;
+        }
+
+        .job-progress-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            color: #6b7280;
+        }
+
+        .job-progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .job-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.5s ease;
+            border-radius: 10px;
+        }
+
+        .job-details {
+            margin-top: 15px;
+            padding: 12px;
+            background: #f9fafb;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            color: #6b7280;
+        }
+
+        .job-error {
+            margin-top: 10px;
+            padding: 12px;
+            background: #fee2e2;
+            border-left: 4px solid #ef4444;
+            border-radius: 8px;
+            color: #7f1d1d;
+            font-size: 0.85rem;
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         @media (max-width: 640px) {
             body {
                 padding: 12px;
@@ -571,10 +723,45 @@
                 padding: 4px;
             }
 
-            .api-box {
-                padding: 10px 40px;
-                font-size: 0.95rem;
-                min-width: 100px;
+            .job-card {
+                padding: 18px;
+                margin-bottom: 15px;
+                border-radius: 16px;
+            }
+
+            .job-card-header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+
+            .job-card-title {
+                font-size: 1rem;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+
+            .job-id-badge {
+                align-self: flex-start;
+            }
+
+            .job-card-status {
+                font-size: 0.85rem;
+            }
+
+            .job-progress-info {
+                font-size: 0.8rem;
+            }
+
+            .job-details {
+                font-size: 0.75rem;
+                padding: 10px;
+            }
+
+            .job-error {
+                font-size: 0.75rem;
+                padding: 10px;
             }
 
             .input-wrapper {
@@ -623,12 +810,6 @@
         <!-- Database Connection -->
         <div class="card">
             <div class="card-title">🔌 Database Connection</div>
-            <div class="input-group">
-                <label>Render API URL</label>
-                <div class="db-url-display">
-                    <span id="renderUrlText">Select an API base above</span>
-                </div>
-            </div>
             <div class="input-group" id="dbUrlGroup">
                 <label>PostgreSQL Connection URL</label>
                 <div id="dbUrlDisplay" class="hidden">
@@ -729,10 +910,13 @@
                             <div style="font-weight: 800; color: #1f2937;">CSV Preview</div>
                             <div style="color: #6b7280; font-size: 0.9rem; margin-top: 4px;">
                                 Showing <span id="previewRange">1-10</span>
+                                <span id="selectedCounter" class="selected-counter hidden">| <span id="selectedCount">0</span> rows selected</span>
                             </div>
                         </div>
                         <div style="display:flex; gap: 10px;">
                             <button class="btn btn-secondary" id="previewToggleBtn" onclick="togglePreviewMode()">Matched</button>
+                            <button class="btn btn-secondary" onclick="selectAllRows()">Select All</button>
+                            <button class="btn btn-secondary" onclick="clearSelection()">Clear</button>
                             <button class="btn btn-secondary" onclick="previewPrev()">-10</button>
                             <button class="btn btn-secondary" onclick="previewNext()">+10</button>
                         </div>
@@ -745,6 +929,9 @@
 
             <div id="jobStatusSection" class="hidden"></div>
         </div>
+
+        <!-- Job Cards Container -->
+        <div id="jobCardsContainer" class="job-cards-container"></div>
     </div>
 
     <script>
@@ -762,6 +949,7 @@
         let previewOffset = 0;
         let columnMapping = {};
         let previewMode = 'matched'; // 'matched' | 'raw'
+        let selectedRows = new Set(); // Store selected row indices
 
         // Check Render connection
         async function checkRenderConnection() {
@@ -1062,11 +1250,17 @@
             document.getElementById('previewRange').textContent = `${start + 1}-${end}`;
 
             if (previewMode === 'raw') {
-                const headerHtml = `<tr>${csvHeader.map(h => `<th>${h}</th>`).join('')}</tr>`;
-                const bodyHtml = csvRows.slice(start, end).map(r => {
-                    return `<tr>${csvHeader.map((_, idx) => `<td>${(r[idx] ?? '')}</td>`).join('')}</tr>`;
+                const headerHtml = `<tr><th style="width: 30px;"><input type="checkbox" class="row-checkbox" onchange="toggleSelectAll()"></th>${csvHeader.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                const bodyHtml = csvRows.slice(start, end).map((r, rowIdx) => {
+                    const globalIdx = start + rowIdx;
+                    const isSelected = selectedRows.has(globalIdx);
+                    return `<tr class="${isSelected ? 'selected' : ''}" onclick="toggleRowSelection(${globalIdx})">
+                        <td><input type="checkbox" class="row-checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleRowSelection(${globalIdx})"></td>
+                        ${csvHeader.map((_, idx) => `<td>${(r[idx] ?? '')}</td>`).join('')}
+                    </tr>`;
                 }).join('');
                 table.innerHTML = `<thead>${headerHtml}</thead><tbody>${bodyHtml}</tbody>`;
+                updateSelectedCounter();
                 card.classList.remove('hidden');
                 return;
             }
@@ -1090,22 +1284,81 @@
             const idxByCsv = {};
             csvHeader.forEach((h, i) => { idxByCsv[h] = i; });
 
-            const headerHtml = `<tr>${mappedTableAttrs.map(h => `<th>${h}</th>`).join('')}</tr>`;
-            const bodyHtml = csvRows.slice(start, end).map(r => {
-                return `<tr>${mappedTableAttrs.map((attr) => {
-                    const mapped = columnMapping[attr];
-                    const idx = idxByCsv[mapped];
-                    return `<td>${(idx === undefined ? '' : (r[idx] ?? ''))}</td>`;
-                }).join('')}</tr>`;
+            const headerHtml = `<tr><th style="width: 30px;"><input type="checkbox" class="row-checkbox" onchange="toggleSelectAll()"></th>${mappedTableAttrs.map(h => `<th>${h}</th>`).join('')}</tr>`;
+            const bodyHtml = csvRows.slice(start, end).map((r, rowIdx) => {
+                const globalIdx = start + rowIdx;
+                const isSelected = selectedRows.has(globalIdx);
+                return `<tr class="${isSelected ? 'selected' : ''}" onclick="toggleRowSelection(${globalIdx})">
+                    <td><input type="checkbox" class="row-checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleRowSelection(${globalIdx})"></td>
+                    ${mappedTableAttrs.map((attr) => {
+                        const mapped = columnMapping[attr];
+                        const idx = idxByCsv[mapped];
+                        return `<td>${(idx === undefined ? '' : (r[idx] ?? ''))}</td>`;
+                    }).join('')}
+                </tr>`;
             }).join('');
 
             table.innerHTML = `<thead>${headerHtml}</thead><tbody>${bodyHtml}</tbody>`;
+            updateSelectedCounter();
             card.classList.remove('hidden');
         }
 
         function togglePreviewMode() {
             previewMode = previewMode === 'raw' ? 'matched' : 'raw';
             renderPreview();
+        }
+
+        // Row selection functions
+        function toggleRowSelection(rowIndex) {
+            if (selectedRows.has(rowIndex)) {
+                selectedRows.delete(rowIndex);
+            } else {
+                selectedRows.add(rowIndex);
+            }
+            renderPreview();
+        }
+
+        function toggleSelectAll() {
+            const start = previewOffset;
+            const end = Math.min(previewOffset + 10, csvRows.length);
+            const allSelected = Array.from({length: end - start}, (_, i) => start + i).every(i => selectedRows.has(i));
+            
+            if (allSelected) {
+                // Deselect all in current view
+                for (let i = start; i < end; i++) {
+                    selectedRows.delete(i);
+                }
+            } else {
+                // Select all in current view
+                for (let i = start; i < end; i++) {
+                    selectedRows.add(i);
+                }
+            }
+            renderPreview();
+        }
+
+        function selectAllRows() {
+            for (let i = 0; i < csvRows.length; i++) {
+                selectedRows.add(i);
+            }
+            renderPreview();
+        }
+
+        function clearSelection() {
+            selectedRows.clear();
+            renderPreview();
+        }
+
+        function updateSelectedCounter() {
+            const counter = document.getElementById('selectedCounter');
+            const count = document.getElementById('selectedCount');
+            
+            if (selectedRows.size > 0) {
+                counter.classList.remove('hidden');
+                count.textContent = selectedRows.size;
+            } else {
+                counter.classList.add('hidden');
+            }
         }
 
         function previewNext() {
@@ -1145,6 +1398,7 @@
                 csvRows = lines.slice(1).map(parseCsvLine);
                 previewOffset = 0;
                 previewMode = 'matched';
+                selectedRows.clear(); // Reset selection when new file is verified
 
                 buildMappingUI();
                 renderPreview();
@@ -1245,7 +1499,12 @@
                 const outLines = [];
                 outLines.push(outHeader.map(csvEscape).join(','));
 
-                for (const row of csvRows) {
+                // Filter rows based on selection
+                const rowsToProcess = selectedRows.size > 0 
+                    ? Array.from(selectedRows).sort((a, b) => a - b).map(i => csvRows[i])
+                    : csvRows;
+
+                for (const row of rowsToProcess) {
                     const outRow = outHeader.map(attr => {
                         const mapped = columnMapping[attr];
                         const idx = idxByCsv[mapped];
@@ -1285,7 +1544,8 @@
                 
                 if (res.ok) {
                     showNotification('Upload started!', 'info');
-                    monitorJob(data.job_id);
+                    createJobCard(data.job_id, selectedFile.name);
+                    monitorJobCard(data.job_id);
                 } else {
                     showNotification('Error: ' + errorToString(data.detail), 'error');
                 }
@@ -1294,48 +1554,119 @@
             }
         }
 
-        async function monitorJob(jobId) {
-            const section = document.getElementById('jobStatusSection');
-            section.classList.remove('hidden');
-            section.innerHTML = `
-                <div class="job-status">
-                    <div style="display: flex; align-items: center; gap: 10px;">
+        // Create job card
+        function createJobCard(jobId, fileName) {
+            const container = document.getElementById('jobCardsContainer');
+            
+            const jobCard = document.createElement('div');
+            jobCard.className = 'job-card';
+            jobCard.id = `job-card-${jobId}`;
+            
+            jobCard.innerHTML = `
+                <div class="job-card-header">
+                    <div class="job-card-title">
+                        📤 ${fileName}
+                        <span class="job-id-badge">ID: ${jobId}</span>
+                    </div>
+                    <div class="job-card-status job-status-processing">
                         <div class="spinner"></div>
-                        <strong>Processing upload...</strong>
+                        Processing...
                     </div>
                 </div>
+                <div class="job-progress-section">
+                    <div class="job-progress-info">
+                        <span>Upload Progress</span>
+                        <span id="job-progress-${jobId}">0%</span>
+                    </div>
+                    <div class="job-progress-bar">
+                        <div class="job-progress-fill" id="job-progress-bar-${jobId}" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="job-details" id="job-details-${jobId}">
+                    Started: ${new Date().toLocaleString()} | API: ${selectedApi}
+                </div>
             `;
+            
+            container.appendChild(jobCard);
+        }
 
+        // Monitor job with card updates
+        async function monitorJobCard(jobId) {
             const interval = setInterval(async () => {
                 try {
                     const res = await fetch(`${renderApiUrl}/job-status/${jobId}`);
                     const job = await res.json();
 
+                    const card = document.getElementById(`job-card-${jobId}`);
+                    if (!card) {
+                        clearInterval(interval);
+                        return;
+                    }
+
+                    const statusEl = card.querySelector('.job-card-status');
+                    const progressEl = document.getElementById(`job-progress-${jobId}`);
+                    const progressBarEl = document.getElementById(`job-progress-bar-${jobId}`);
+                    const detailsEl = document.getElementById(`job-details-${jobId}`);
+
                     if (job.status === 'completed') {
                         clearInterval(interval);
-                        section.innerHTML = `
-                            <div class="job-status completed">
-                                <strong>✅ Upload Complete!</strong>
-                                <div style="margin-top: 10px; font-size: 0.9rem;">
-                                    Total rows: ${job.rows_total} | 
-                                    Inserted: ${job.rows_inserted} | 
-                                    Skipped: ${job.rows_skipped}
-                                </div>
-                            </div>
+                        statusEl.className = 'job-card-status job-status-completed';
+                        statusEl.innerHTML = '✅ Completed';
+                        progressEl.textContent = '100%';
+                        progressBarEl.style.width = '100%';
+                        detailsEl.innerHTML = `
+                            Completed: ${new Date().toLocaleString()} | 
+                            Total rows: ${job.rows_total} | 
+                            Inserted: ${job.rows_inserted} | 
+                            Skipped: ${job.rows_skipped} | 
+                            API: ${selectedApi}
                         `;
                         showNotification('File uploaded successfully!', 'success');
                     } else if (job.status === 'failed') {
                         clearInterval(interval);
-                        section.innerHTML = `
-                            <div class="job-status failed">
-                                <strong>❌ Upload Failed</strong>
-                                <div style="margin-top: 10px; font-size: 0.9rem;">${job.error}</div>
-                            </div>
+                        statusEl.className = 'job-card-status job-status-failed';
+                        statusEl.innerHTML = '❌ Failed';
+                        progressEl.textContent = '0%';
+                        progressBarEl.style.width = '0%';
+                        
+                        // Add error section
+                        const errorSection = document.createElement('div');
+                        errorSection.className = 'job-error';
+                        errorSection.textContent = job.error || 'Unknown error occurred';
+                        card.appendChild(errorSection);
+                        
+                        detailsEl.innerHTML = `
+                            Failed: ${new Date().toLocaleString()} | 
+                            API: ${selectedApi}
                         `;
                         showNotification('Upload failed', 'error');
+                    } else if (job.status === 'processing') {
+                        // Update progress if available
+                        const progress = job.progress || 0;
+                        progressEl.textContent = `${progress}%`;
+                        progressBarEl.style.width = `${progress}%`;
+                        
+                        if (job.rows_processed !== undefined) {
+                            detailsEl.innerHTML = `
+                                Processing... | 
+                                Rows processed: ${job.rows_processed} | 
+                                API: ${selectedApi}
+                            `;
+                        }
                     }
                 } catch (err) {
                     clearInterval(interval);
+                    const card = document.getElementById(`job-card-${jobId}`);
+                    if (card) {
+                        const statusEl = card.querySelector('.job-card-status');
+                        const detailsEl = document.getElementById(`job-details-${jobId}`);
+                        statusEl.className = 'job-card-status job-status-failed';
+                        statusEl.innerHTML = '❌ Connection Error';
+                        detailsEl.innerHTML = `
+                            Error: Could not check job status | 
+                            API: ${selectedApi}
+                        `;
+                    }
                     showNotification('Error checking job status', 'error');
                 }
             }, 2000);
