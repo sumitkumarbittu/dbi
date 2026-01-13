@@ -359,6 +359,87 @@
             word-break: break-all;
         }
 
+        .api-selector {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 15px;
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.08);
+            backdrop-filter: blur(15px);
+            border-radius: 25px;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+
+        .api-label {
+            color: white;
+            font-weight: 600;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+
+        .api-boxes {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255,255,255,0.3) transparent;
+            padding: 2px 0;
+            max-width: 100%;
+        }
+
+        .api-boxes::-webkit-scrollbar {
+            height: 4px;
+        }
+
+        .api-boxes::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+        }
+
+        .api-boxes::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.3);
+            border-radius: 2px;
+        }
+
+        .api-boxes::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.5);
+        }
+
+        .api-box {
+            padding: 8px 50px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.8);
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255,255,255,0.1);
+            min-width: 120px;
+            text-align: center;
+            user-select: none;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .api-box:hover {
+            background: rgba(255,255,255,0.25);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .api-box.selected {
+            background: rgba(255,255,255,0.95);
+            color: #667eea;
+            box-shadow: 0 4px 16px rgba(255,255,255,0.4);
+            font-weight: 700;
+            transform: scale(1.05);
+        }
+
         .pill {
             display: inline-flex;
             align-items: center;
@@ -471,6 +552,31 @@
                 font-size: 2rem;
             }
 
+            .api-selector {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+                padding: 12px;
+            }
+
+            .api-label {
+                text-align: center;
+            }
+
+            .api-boxes {
+                justify-content: flex-start;
+                gap: 6px;
+                overflow-x: auto;
+                overflow-y: hidden;
+                padding: 4px;
+            }
+
+            .api-box {
+                padding: 10px 40px;
+                font-size: 0.95rem;
+                min-width: 100px;
+            }
+
             .input-wrapper {
                 flex-direction: column;
                 align-items: stretch;
@@ -506,6 +612,12 @@
                 <div class="status-dot disconnected" id="statusDot"></div>
                 <span id="statusText">Render: Disconnected</span>
             </div>
+            
+            <!-- API Selection -->
+            <div class="api-selector" id="apiSelector">
+                <div class="api-label">API Base:</div>
+                <div class="api-boxes" id="apiBoxes"></div>
+            </div>
         </div>
 
         <!-- Database Connection -->
@@ -513,8 +625,8 @@
             <div class="card-title">🔌 Database Connection</div>
             <div class="input-group">
                 <label>Render API URL</label>
-                <div class="input-wrapper">
-                    <input type="url" id="renderUrl" placeholder="https://your-app.onrender.com" value="">
+                <div class="db-url-display">
+                    <span id="renderUrlText">Select an API base above</span>
                 </div>
             </div>
             <div class="input-group" id="dbUrlGroup">
@@ -636,7 +748,12 @@
     </div>
 
     <script>
-        let renderApiUrl = '';
+        const API_CONFIGS = {
+            'A': 'https://dbi.onrender.com',
+            'B': 'https://dbi-2xer.onrender.com',
+            'C': 'https://dbi2.onrender.com'
+        };
+        let selectedApi = 'B';
         let currentDbUrl = '';
         let tableSchema = null;
         let selectedFile = null;
@@ -648,10 +765,8 @@
 
         // Check Render connection
         async function checkRenderConnection() {
-            const url = document.getElementById('renderUrl').value.trim();
-            if (!url) return;
-
-            renderApiUrl = url.replace(/\/$/, '');
+            const selectedConfig = API_CONFIGS[selectedApi];
+            renderApiUrl = selectedConfig;
             
             try {
                 const res = await fetch(`${renderApiUrl}/health`);
@@ -1245,21 +1360,44 @@
             }, 3000);
         }
 
-        // Auto-check connection when URL changes
-        document.getElementById('renderUrl').addEventListener('blur', checkRenderConnection);
-        document.getElementById('renderUrl').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') checkRenderConnection();
-        });
+        // Initialize API selector
+        function initializeApiSelector() {
+            const container = document.getElementById('apiBoxes');
+            container.innerHTML = '';
+            
+            Object.keys(API_CONFIGS).forEach(key => {
+                const box = document.createElement('div');
+                box.className = `api-box ${key === selectedApi ? 'selected' : ''}`;
+                box.textContent = key;
+                box.onclick = () => selectApi(key);
+                container.appendChild(box);
+            });
+        }
+        
+        function selectApi(key) {
+            selectedApi = key;
+            document.querySelectorAll('.api-box').forEach(box => {
+                box.classList.remove('selected');
+            });
+            event.target.classList.add('selected');
+            
+            // Update the display text
+            document.getElementById('renderUrlText').textContent = API_CONFIGS[key];
+            
+            checkRenderConnection();
+        }
+        
+        // Auto-check connection on load
+        setTimeout(() => {
+            initializeApiSelector();
+            checkRenderConnection();
+        }, 500);
 
         function errorToString(detail) {
         if (typeof detail === 'string') return detail;
         if (detail?.error) return detail.error;
         return JSON.stringify(detail);
         }
-
-
-        // Initial check
-        setTimeout(checkRenderConnection, 500);
     </script>
 </body>
 </html>
