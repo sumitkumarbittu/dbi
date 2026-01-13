@@ -18,6 +18,10 @@
             padding: 20px;
         }
 
+        html, body {
+            overflow-x: hidden;
+        }
+
         .container {
             max-width: 900px;
             margin: 0 auto;
@@ -570,6 +574,8 @@
 
         .job-cards-container {
             margin-top: 20px;
+            position: relative;
+            padding-bottom: 10px;
         }
 
         .job-card {
@@ -577,13 +583,20 @@
             border-radius: 20px;
             padding: 25px;
             margin-bottom: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            transition: transform 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
             animation: slideInUp 0.4s ease;
+            will-change: transform;
+        }
+
+        .job-cards-container.stacked .job-card {
+            position: absolute;
+            left: 0;
+            right: 0;
+            margin-bottom: 0;
         }
 
         .job-card:hover {
-            transform: translateY(-3px);
+            box-shadow: 0 14px 38px rgba(0,0,0,0.16);
         }
 
         .job-card-header {
@@ -594,176 +607,35 @@
         }
 
         .job-card-title {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: #1f2937;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            font-size: 1rem;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
         }
 
         .job-id-badge {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 4px 12px;
-            border-radius: 15px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            font-family: 'Courier New', monospace;
+            align-self: flex-start;
         }
 
         .job-card-status {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 600;
-            font-size: 0.9rem;
-        }
-
-        .job-status-processing {
-            color: #f59e0b;
-        }
-
-        .job-status-completed {
-            color: #10b981;
-        }
-
-        .job-status-failed {
-            color: #ef4444;
-        }
-
-        .job-progress-section {
-            margin-top: 15px;
+            font-size: 0.85rem;
         }
 
         .job-progress-info {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-            font-size: 0.85rem;
-            color: #6b7280;
-        }
-
-        .job-progress-bar {
-            width: 100%;
-            height: 8px;
-            background: #e5e7eb;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-
-        .job-progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            transition: width 0.5s ease;
-            border-radius: 10px;
+            font-size: 0.8rem;
         }
 
         .job-details {
-            margin-top: 15px;
-            padding: 12px;
-            background: #f9fafb;
-            border-radius: 10px;
-            font-size: 0.85rem;
-            color: #6b7280;
+            font-size: 0.75rem;
+            padding: 10px;
         }
 
         .job-error {
-            margin-top: 10px;
-            padding: 12px;
-            background: #fee2e2;
-            border-left: 4px solid #ef4444;
-            border-radius: 8px;
-            color: #7f1d1d;
-            font-size: 0.85rem;
-        }
-
-        @keyframes slideInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            font-size: 0.75rem;
+            padding: 10px;
         }
 
         @media (max-width: 640px) {
-            body {
-                padding: 12px;
-            }
-
-            .card {
-                padding: 18px;
-                border-radius: 16px;
-            }
-
-            .header h1 {
-                font-size: 2rem;
-            }
-
-            .api-selector {
-                flex-direction: column;
-                align-items: stretch;
-                gap: 8px;
-                padding: 12px;
-            }
-
-            .api-label {
-                text-align: center;
-            }
-
-            .api-boxes {
-                justify-content: flex-start;
-                gap: 6px;
-                overflow-x: auto;
-                overflow-y: hidden;
-                padding: 4px;
-            }
-
-            .job-card {
-                padding: 18px;
-                margin-bottom: 15px;
-                border-radius: 16px;
-            }
-
-            .job-card-header {
-                flex-direction: column;
-                align-items: stretch;
-                gap: 10px;
-            }
-
-            .job-card-title {
-                font-size: 1rem;
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 8px;
-            }
-
-            .job-id-badge {
-                align-self: flex-start;
-            }
-
-            .job-card-status {
-                font-size: 0.85rem;
-            }
-
-            .job-progress-info {
-                font-size: 0.8rem;
-            }
-
-            .job-details {
-                font-size: 0.75rem;
-                padding: 10px;
-            }
-
-            .job-error {
-                font-size: 0.75rem;
-                padding: 10px;
-            }
-
             .input-wrapper {
                 flex-direction: column;
                 align-items: stretch;
@@ -780,6 +652,19 @@
 
             .file-info {
                 flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+
+            .db-url-display {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .job-card {
+                width: 100%;
                 align-items: stretch;
                 gap: 12px;
             }
@@ -907,13 +792,13 @@
                 <div class="preview-card hidden" id="previewCard">
                     <div style="display:flex; align-items:center; justify-content: space-between; gap: 10px;">
                         <div>
-                            <div style="font-weight: 800; color: #1f2937;">CSV Preview</div>
+                            <div style="font-weight: 800; color: #1f2937;" id="previewTitle">Preview</div>
                             <div style="color: #6b7280; font-size: 0.9rem; margin-top: 4px;">
                                 Showing <span id="previewRange">1-10</span>
                                 <span id="selectedCounter" class="selected-counter hidden">| <span id="selectedCount">0</span> rows selected</span>
                             </div>
                         </div>
-                        <div style="display:flex; gap: 10px;">
+                        <div style="display:flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end;">
                             <button class="btn btn-secondary" id="previewToggleBtn" onclick="togglePreviewMode()">Matched</button>
                             <button class="btn btn-secondary" onclick="selectAllRows()">Select All</button>
                             <button class="btn btn-secondary" onclick="clearSelection()">Clear</button>
@@ -935,21 +820,73 @@
     </div>
 
     <script>
-        let selectedApi = 'B'; // Default to API B
         const API_CONFIGS = {
             'A': 'https://dbi.onrender.com',
             'B': 'https://dbi-2xer.onrender.com',
             'C': 'https://dbi2.onrender.com'
         };
+        let selectedApi = 'B';
+        let renderApiUrl = API_CONFIGS['B'];
         let currentDbUrl = '';
         let tableSchema = null;
         let selectedFile = null;
         let csvHeader = [];
         let csvRows = [];
+        let jsonObjects = null;
         let previewOffset = 0;
         let columnMapping = {};
         let previewMode = 'matched'; // 'matched' | 'raw'
         let selectedRows = new Set(); // Store selected row indices
+        let jobCardOrder = [];
+
+        function escapeHtml(value) {
+            return String(value)
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+        }
+
+        function isBufferLikeObject(v) {
+            return v && typeof v === 'object' && v.type === 'Buffer' && Array.isArray(v.data);
+        }
+
+        function bufferObjectToBase64(v) {
+            try {
+                const bytes = new Uint8Array(v.data);
+                let binary = '';
+                const chunk = 0x8000;
+                for (let i = 0; i < bytes.length; i += chunk) {
+                    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+                }
+                return btoa(binary);
+            } catch {
+                return null;
+            }
+        }
+
+        function formatPreviewValue(v) {
+            if (v === null || v === undefined) return '';
+            if (typeof v === 'string') {
+                const s = v;
+                return s.length > 500 ? (s.slice(0, 500) + '…') : s;
+            }
+            if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+            if (isBufferLikeObject(v)) {
+                const b64 = bufferObjectToBase64(v);
+                if (b64) return `base64:${b64.length > 500 ? (b64.slice(0, 500) + '…') : b64}`;
+            }
+            if (typeof v === 'object') {
+                try {
+                    const s = JSON.stringify(v);
+                    return s && s.length > 500 ? (s.slice(0, 500) + '…') : (s ?? '');
+                } catch {
+                    return '[unprintable]';
+                }
+            }
+            return String(v);
+        }
 
         // Check Render connection
         async function checkRenderConnection() {
@@ -1231,6 +1168,26 @@
             section.classList.remove('hidden');
         }
 
+        function setPreviewTitle() {
+            const titleEl = document.getElementById('previewTitle');
+            if (!titleEl) return;
+            if (!selectedFile) {
+                titleEl.textContent = 'Preview';
+                return;
+            }
+            titleEl.textContent = selectedFile.name.toLowerCase().endsWith('.json') ? 'JSON Preview' : 'CSV Preview';
+        }
+
+        function getJsonKeySet(dataArr) {
+            const keys = new Set();
+            for (const row of dataArr) {
+                if (row && typeof row === 'object' && !Array.isArray(row)) {
+                    Object.keys(row).forEach(k => keys.add(k));
+                }
+            }
+            return Array.from(keys);
+        }
+
         function renderPreview() {
             const card = document.getElementById('previewCard');
             const table = document.getElementById('previewTable');
@@ -1256,7 +1213,7 @@
                     const isSelected = selectedRows.has(globalIdx);
                     return `<tr class="${isSelected ? 'selected' : ''}" onclick="toggleRowSelection(${globalIdx})">
                         <td><input type="checkbox" class="row-checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleRowSelection(${globalIdx})"></td>
-                        ${csvHeader.map((_, idx) => `<td>${(r[idx] ?? '')}</td>`).join('')}
+                        ${csvHeader.map((_, idx) => `<td>${escapeHtml(formatPreviewValue(r[idx]))}</td>`).join('')}
                     </tr>`;
                 }).join('');
                 table.innerHTML = `<thead>${headerHtml}</thead><tbody>${bodyHtml}</tbody>`;
@@ -1293,7 +1250,7 @@
                     ${mappedTableAttrs.map((attr) => {
                         const mapped = columnMapping[attr];
                         const idx = idxByCsv[mapped];
-                        return `<td>${(idx === undefined ? '' : (r[idx] ?? ''))}</td>`;
+                        return `<td>${escapeHtml(formatPreviewValue(idx === undefined ? '' : (r[idx] ?? '')))}</td>`;
                     }).join('')}
                 </tr>`;
             }).join('');
@@ -1382,27 +1339,56 @@
                 showNotification('Please set table schema first', 'error');
                 return;
             }
-            if (!selectedFile.name.endsWith('.csv')) {
-                showNotification('Verify supports CSV preview only', 'error');
-                return;
-            }
 
             try {
-                const text = await selectedFile.text();
-                const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.length > 0);
-                if (lines.length === 0) {
-                    showNotification('CSV file is empty', 'error');
+                setPreviewTitle();
+
+                if (selectedFile.name.toLowerCase().endsWith('.csv')) {
+                    const text = await selectedFile.text();
+                    const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.length > 0);
+                    if (lines.length === 0) {
+                        showNotification('CSV file is empty', 'error');
+                        return;
+                    }
+                    csvHeader = parseCsvLine(lines[0]).map(s => s.trim()).filter(Boolean);
+                    csvRows = lines.slice(1).map(parseCsvLine);
+                    jsonObjects = null;
+                } else if (selectedFile.name.toLowerCase().endsWith('.json')) {
+                    const text = await selectedFile.text();
+                    let parsed;
+                    try {
+                        parsed = JSON.parse(text);
+                    } catch {
+                        showNotification('Invalid JSON: could not parse file', 'error');
+                        return;
+                    }
+
+                    const arr = Array.isArray(parsed) ? parsed : [parsed];
+                    const objs = arr.filter(x => x && typeof x === 'object' && !Array.isArray(x));
+                    if (objs.length === 0) {
+                        showNotification('JSON must be an object or an array of objects', 'error');
+                        return;
+                    }
+
+                    jsonObjects = objs;
+                    csvHeader = getJsonKeySet(objs);
+                    if (!csvHeader || csvHeader.length === 0) {
+                        showNotification('JSON has no keys to preview', 'error');
+                        return;
+                    }
+                    csvRows = objs.map(o => csvHeader.map(k => (o?.[k] ?? '')));
+                } else {
+                    showNotification('Only CSV and JSON files are supported', 'error');
                     return;
                 }
-                csvHeader = parseCsvLine(lines[0]).map(s => s.trim()).filter(Boolean);
-                csvRows = lines.slice(1).map(parseCsvLine);
+
                 previewOffset = 0;
                 previewMode = 'matched';
-                selectedRows.clear(); // Reset selection when new file is verified
+                selectedRows.clear();
 
                 buildMappingUI();
                 renderPreview();
-                showNotification('CSV verified!', 'success');
+                showNotification((selectedFile.name.toLowerCase().endsWith('.json') ? 'JSON' : 'CSV') + ' verified!', 'success');
             } catch (err) {
                 showNotification('Verify error: ' + err.message, 'error');
             }
@@ -1445,6 +1431,7 @@
             selectedFile = file;
             csvHeader = [];
             csvRows = [];
+            jsonObjects = null;
             previewOffset = 0;
             columnMapping = {};
             document.getElementById('fileName').textContent = file.name;
@@ -1452,6 +1439,7 @@
             document.getElementById('fileInfoSection').classList.remove('hidden');
             document.getElementById('mappingSection').classList.add('hidden');
             document.getElementById('previewCard').classList.add('hidden');
+            setPreviewTitle();
         }
 
         async function uploadFile() {
@@ -1481,26 +1469,30 @@
             }
 
             // For CSV, require verify + mapping
-            if (selectedFile.name.endsWith('.csv')) {
-                if (!csvHeader || csvHeader.length === 0) {
-                    showNotification('Click Verify to load CSV header and preview first', 'error');
-                    return;
-                }
+            if (!csvHeader || csvHeader.length === 0) {
+                showNotification('Click Verify to load preview and mapping first', 'error');
+                return;
+            }
 
-                // PK can be auto-generated. If user maps PK, keep it; otherwise we'll omit it and send empty primary_key.
+            const isCsv = selectedFile.name.toLowerCase().endsWith('.csv');
+            const isJson = selectedFile.name.toLowerCase().endsWith('.json');
 
-                // Build transformed CSV with headers as mapped table attributes (excluding keep empty)
-                const includedTableAttrs = tableSchema.attributes.filter(a => columnMapping[a] && columnMapping[a] !== '__AUTO__');
+            // PK can be auto-generated. If user maps PK, keep it; otherwise we'll omit it and send empty primary_key.
+            const includedTableAttrs = tableSchema.attributes.filter(a => columnMapping[a] && columnMapping[a] !== '__AUTO__');
+            if (includedTableAttrs.length === 0) {
+                showNotification('Please map at least one attribute (or use Raw preview)', 'error');
+                return;
+            }
+
+            if (isCsv) {
                 const outHeader = includedTableAttrs;
-
                 const idxByCsv = {};
                 csvHeader.forEach((h, i) => { idxByCsv[h] = i; });
 
                 const outLines = [];
                 outLines.push(outHeader.map(csvEscape).join(','));
 
-                // Filter rows based on selection
-                const rowsToProcess = selectedRows.size > 0 
+                const rowsToProcess = selectedRows.size > 0
                     ? Array.from(selectedRows).sort((a, b) => a - b).map(i => csvRows[i])
                     : csvRows;
 
@@ -1517,22 +1509,49 @@
                 selectedFile = new File([blob], selectedFile.name, { type: 'text/csv' });
             }
 
+            if (isJson) {
+                if (!jsonObjects || !Array.isArray(jsonObjects) || jsonObjects.length === 0) {
+                    showNotification('JSON not verified. Click Verify first', 'error');
+                    return;
+                }
+
+                const rowsToProcess = selectedRows.size > 0
+                    ? Array.from(selectedRows).sort((a, b) => a - b).map(i => jsonObjects[i]).filter(Boolean)
+                    : jsonObjects;
+
+                const outObjects = rowsToProcess.map((obj) => {
+                    const out = {};
+                    for (const attr of includedTableAttrs) {
+                        const mapped = columnMapping[attr];
+                        if (!mapped || mapped === '__AUTO__') continue;
+                        const rawVal = obj?.[mapped];
+                        if (rawVal === null || rawVal === undefined) {
+                            out[attr] = '';
+                        } else if (typeof rawVal === 'object') {
+                            if (isBufferLikeObject(rawVal)) {
+                                const b64 = bufferObjectToBase64(rawVal);
+                                out[attr] = b64 ? b64 : JSON.stringify(rawVal);
+                            } else {
+                                out[attr] = JSON.stringify(rawVal);
+                            }
+                        } else {
+                            out[attr] = rawVal;
+                        }
+                    }
+                    return out;
+                });
+
+                const blob = new Blob([JSON.stringify(outObjects)], { type: 'application/json' });
+                selectedFile = new File([blob], selectedFile.name, { type: 'application/json' });
+            }
+
             const formData = new FormData();
             formData.append('file', selectedFile);
             formData.append('table', tableSchema.table);
-            if (selectedFile.name.endsWith('.csv')) {
-                const includedTableAttrs = tableSchema.attributes.filter(a => columnMapping[a] && columnMapping[a] !== '__AUTO__');
-                formData.append('columns', includedTableAttrs.join(','));
-            } else {
-                formData.append('columns', tableSchema.attributes.join(','));
-            }
+            formData.append('columns', includedTableAttrs.join(','));
 
-            if (selectedFile.name.endsWith('.csv')) {
-                const mappedPk = (tableSchema.primary_key || []).filter(pk => columnMapping[pk] && columnMapping[pk] !== '__AUTO__');
-                formData.append('primary_key', mappedPk.join(','));
-            } else {
-                formData.append('primary_key', tableSchema.primary_key.join(','));
-            }
+            const mappedPk = (tableSchema.primary_key || []).filter(pk => columnMapping[pk] && columnMapping[pk] !== '__AUTO__');
+            formData.append('primary_key', mappedPk.join(','));
 
             try {
                 const res = await fetch(`${renderApiUrl}/upload-data`, {
@@ -1586,9 +1605,55 @@
                     Started: ${new Date().toLocaleString()} | API: ${selectedApi}
                 </div>
             `;
-            
-            container.appendChild(jobCard);
+
+            // Newest card should be on top of the stack
+            container.insertBefore(jobCard, container.firstChild);
+            jobCardOrder = [jobId, ...jobCardOrder.filter(id => id !== jobId)];
+            updateJobCardStack();
         }
+
+        function updateJobCardStack() {
+            const container = document.getElementById('jobCardsContainer');
+            const isStacked = window.innerWidth > 640;
+            container.classList.toggle('stacked', isStacked);
+
+            const cards = jobCardOrder
+                .map(id => document.getElementById(`job-card-${id}`))
+                .filter(Boolean);
+
+            if (!isStacked) {
+                container.style.minHeight = '0px';
+                cards.forEach((card, i) => {
+                    card.style.zIndex = '';
+                    card.style.transform = '';
+                    card.style.position = 'relative';
+                    card.style.marginBottom = '12px';
+                });
+                return;
+            }
+
+            const offsetY = 12;
+            const scaleStep = 0.018;
+
+            const topCard = cards[0];
+            const baseHeight = topCard ? topCard.getBoundingClientRect().height : 0;
+            const minHeight = baseHeight ? (baseHeight + Math.min(cards.length - 1, 7) * offsetY + 16) : 0;
+            container.style.minHeight = minHeight ? `${Math.max(minHeight, 140)}px` : '0px';
+
+            cards.forEach((card, i) => {
+                const clamped = Math.min(i, 7);
+                const translateY = clamped * offsetY;
+                const scale = 1 - clamped * scaleStep;
+                card.style.position = 'absolute';
+                card.style.marginBottom = '0';
+                card.style.zIndex = String(1000 - i);
+                card.style.transform = `translateY(${translateY}px) scale(${scale})`;
+            });
+        }
+
+        window.addEventListener('resize', () => {
+            updateJobCardStack();
+        });
 
         // Monitor job with card updates
         async function monitorJobCard(jobId) {
@@ -1700,53 +1765,34 @@
                 const box = document.createElement('div');
                 box.className = `api-box ${key === selectedApi ? 'selected' : ''}`;
                 box.textContent = key;
-                box.onclick = (e) => selectApi(key, e);
+                box.onclick = () => selectApi(key, box);
                 container.appendChild(box);
             });
         }
         
-        function selectApi(key, event) {
-            if (selectedApi === key) return; // Skip if already selected
-            
+        function selectApi(key, el) {
             selectedApi = key;
-            
-            // Update UI
+            renderApiUrl = API_CONFIGS[key];
             document.querySelectorAll('.api-box').forEach(box => {
-                if (box.textContent === key) {
-                    box.classList.add('selected');
-                } else {
-                    box.classList.remove('selected');
-                }
+                box.classList.remove('selected');
             });
+            if (el) {
+                el.classList.add('selected');
+            }
             
             // Update the display text
             document.getElementById('renderUrlText').textContent = API_CONFIGS[key];
             
-            // Save to localStorage
-            localStorage.setItem('selectedApi', key);
-            
-            // Update connection status
             checkRenderConnection();
         }
         
-        // Initialize on load
         document.addEventListener('DOMContentLoaded', () => {
-            // Load saved API preference
-            const savedApi = localStorage.getItem('selectedApi') || 'B';
-            selectedApi = Object.keys(API_CONFIGS).includes(savedApi) ? savedApi : 'B';
-            
-            // Initialize UI
+            // Always reset to B on reload
+            selectedApi = 'B';
+            renderApiUrl = API_CONFIGS[selectedApi];
             initializeApiSelector();
-            
-            // Set initial selection
-            document.querySelectorAll('.api-box').forEach(box => {
-                if (box.textContent === selectedApi) {
-                    box.classList.add('selected');
-                }
-            });
-            
-            // Update display and check connection
-            document.getElementById('renderUrlText').textContent = API_CONFIGS[selectedApi];
+            const urlText = document.getElementById('renderUrlText');
+            if (urlText) urlText.textContent = API_CONFIGS[selectedApi];
             checkRenderConnection();
         });
 
