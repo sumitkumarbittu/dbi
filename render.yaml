@@ -1,0 +1,19 @@
+services:
+  # Web Service
+  - type: web
+    name: dbi
+    env: python
+    plan: free
+    buildCommand: "docker build -t dbi ."
+    startCommand: "docker run -p $PORT:8000 --env PORT=$PORT dbi"
+    healthCheckPath: /health
+    autoDeploy: true
+    
+  # Background Worker (for file processing)
+  - type: worker
+    name: dbi-worker
+    env: python
+    plan: free
+    buildCommand: "docker build -t dbi-worker ."
+    startCommand: "docker run --env PORT=$PORT dbi-worker"
+    autoDeploy: true
