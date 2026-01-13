@@ -935,12 +935,12 @@
     </div>
 
     <script>
+        let selectedApi = 'B'; // Default to API B
         const API_CONFIGS = {
             'A': 'https://dbi.onrender.com',
             'B': 'https://dbi-2xer.onrender.com',
             'C': 'https://dbi2.onrender.com'
         };
-        let selectedApi = 'B';
         let currentDbUrl = '';
         let tableSchema = null;
         let selectedFile = null;
@@ -1706,28 +1706,49 @@
         }
         
         function selectApi(key, event) {
-            selectedApi = key;
-            document.querySelectorAll('.api-box').forEach(box => {
-                box.classList.remove('selected');
-            });
+            if (selectedApi === key) return; // Skip if already selected
             
-            // Get the clicked element from the event
-            const clickedElement = event ? event.currentTarget : document.querySelector(`.api-box:contains('${key}')`);
-            if (clickedElement) {
-                clickedElement.classList.add('selected');
-            }
+            selectedApi = key;
+            
+            // Update UI
+            document.querySelectorAll('.api-box').forEach(box => {
+                if (box.textContent === key) {
+                    box.classList.add('selected');
+                } else {
+                    box.classList.remove('selected');
+                }
+            });
             
             // Update the display text
             document.getElementById('renderUrlText').textContent = API_CONFIGS[key];
             
+            // Save to localStorage
+            localStorage.setItem('selectedApi', key);
+            
+            // Update connection status
             checkRenderConnection();
         }
         
-        // Auto-check connection on load
-        setTimeout(() => {
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Load saved API preference
+            const savedApi = localStorage.getItem('selectedApi') || 'B';
+            selectedApi = Object.keys(API_CONFIGS).includes(savedApi) ? savedApi : 'B';
+            
+            // Initialize UI
             initializeApiSelector();
+            
+            // Set initial selection
+            document.querySelectorAll('.api-box').forEach(box => {
+                if (box.textContent === selectedApi) {
+                    box.classList.add('selected');
+                }
+            });
+            
+            // Update display and check connection
+            document.getElementById('renderUrlText').textContent = API_CONFIGS[selectedApi];
             checkRenderConnection();
-        }, 500);
+        });
 
         function errorToString(detail) {
         if (typeof detail === 'string') return detail;
