@@ -433,6 +433,16 @@ async def upload_data(
                 detail="primary_key must be included in columns: " + ", ".join(missing_pk_in_cols)
             )
 
+    # Smart deduplication: if primary_key is not provided, auto-detect from target table.
+    if not pk_list:
+        conn = await get_db_conn()
+        try:
+            _, detected_pk = await get_table_schema(conn, table, "public")
+        finally:
+            await conn.close()
+        if detected_pk:
+            pk_list = detected_pk
+
     file_bytes = await file.read()
     filename = file.filename.lower()
 
