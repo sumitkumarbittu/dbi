@@ -7,6 +7,7 @@ import io
 import re
 import os
 import random
+from urllib.parse import urlparse
 
 app = FastAPI()
 
@@ -23,7 +24,10 @@ app.add_middleware(
 # ----------------------------
 # Globals
 # ----------------------------
-DATABASE_URL = None
+TARGET_DB_URL = None
+SOURCE_DB_URL = None
+TARGET_DB_CONN = None
+SOURCE_DB_CONN = None
 JOBS = {}
 
 IDENT_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
@@ -63,10 +67,41 @@ def get_csv_header_columns(file_bytes: bytes):
     return cols
 
 
+async def get_target_db_conn():
+    global TARGET_DB_CONN
+    if not TARGET_DB_URL:
+        raise HTTPException(status_code=400, detail="Target database not configured")
+    if TARGET_DB_CONN is None or TARGET_DB_CONN.closed:
+        TARGET_DB_CONN = await psycopg.AsyncConnection.connect(TARGET_DB_URL)
+    return TARGET_DB_CONN
+
+
+async def get_source_db_conn():
+    global SOURCE_DB_CONN
+    if not SOURCE_DB_URL:
+        raise HTTPException(status_code=400, detail="Source database not configured")
+    if SOURCE_DB_CONN is None or SOURCE_DB_CONN.closed:
+        SOURCE_DB_CONN = await psycopg.AsyncConnection.connect(SOURCE_DB_URL)
+    return SOURCE_DB_CONN
+
+
+async def close_target_db_conn():
+    global TARGET_DB_CONN
+    if TARGET_DB_CONN and not TARGET_DB_CONN.closed:
+        await TARGET_DB_CONN.close()
+        TARGET_DB_CONN = None
+
+
+async def close_source_db_conn():
+    global SOURCE_DB_CONN
+    if SOURCE_DB_CONN and not SOURCE_DB_CONN.closed:
+        await SOURCE_DB_CONN.close()
+        SOURCE_DB_CONN = None
+
+
+# Legacy alias for backward compatibility
 async def get_db_conn():
-    if not DATABASE_URL:
-        raise HTTPException(status_code=400, detail="Database not configured")
-    return await psycopg.AsyncConnection.connect(DATABASE_URL)
+    return await get_target_db_conn()
 
 
 async def get_identity_always_columns(conn, table, schema="public"):
@@ -265,13 +300,17 @@ async def process_upload(job_id, table, columns, pk_columns, file_bytes, filenam
 
 @app.post("/save-db")
 async def save_db(payload: dict):
-    global DATABASE_URL
+    global TARGET_DB_URL, TARGET_DB_CONN
     db_url = payload.get("database_url")
 
     if not db_url:
         raise HTTPException(status_code=400, detail="database_url required")
 
-    DATABASE_URL = db_url
+    # Close existing connection if URL changed
+    if TARGET_DB_URL != db_url:
+        await close_target_db_conn()
+
+    TARGET_DB_URL = db_url
     return {"status": "saved"}
 
 
@@ -413,6 +452,104 @@ async def create_table_api(payload: dict):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+# ============================
+# Source Database APIs
+# ============================
+
+@app.post("/connect-source-db")
+async def connect_source_db(payload: dict):
+    global SOURCE_DB_URL, SOURCE_DB_CONN
+    db_url = payload.get("database_url")
+
+    if not db_url:
+        raise HTTPException(status_code=400, detail="database_url required")
+
+    # Close existing connection if URL changed
+    if SOURCE_DB_URL != db_url:
+        await close_source_db_conn()
+
+    SOURCE_DB_URL = db_url
+
+    # Test the connection
+    try:
+        conn = await get_source_db_conn()
+        async with conn.cursor() as cur:
+            await cur.execute("SELECT 1")
+            await cur.fetchone()
+        return {"status": "connected", "database_url": mask_url(db_url)}
+    except Exception as e:
+        SOURCE_DB_URL = None
+        await close_source_db_conn()
+        raise HTTPException(status_code=400, detail=f"Failed to connect: {str(e)}")
+
+
+@app.post("/disconnect-source-db")
+async def disconnect_source_db():
+    global SOURCE_DB_URL
+    await close_source_db_conn()
+    SOURCE_DB_URL = None
+    return {"status": "disconnected"}
+
+
+@app.post("/execute-query")
+async def execute_query(payload: dict):
+    query = payload.get("query")
+    params = payload.get("params", [])
+    limit = payload.get("limit", 1000)
+
+    if not query:
+        raise HTTPException(status_code=400, detail="query is required")
+
+    # Security: Only allow SELECT queries
+    query_stripped = query.strip().upper()
+    if not query_stripped.startswith("SELECT"):
+        raise HTTPException(status_code=400, detail="Only SELECT queries are allowed")
+
+    # Prevent dangerous keywords
+    forbidden_keywords = ["INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "TRUNCATE", "EXEC", "EXECUTE"]
+    for keyword in forbidden_keywords:
+        if keyword in query_stripped:
+            raise HTTPException(status_code=400, detail=f"Query contains forbidden keyword: {keyword}")
+
+    try:
+        conn = await get_source_db_conn()
+        async with conn.cursor() as cur:
+            await cur.execute(query, params)
+            rows = await cur.fetchall()
+            columns = [desc[0] for desc in cur.description] if cur.description else []
+
+            # Convert to list of dicts
+            results = []
+            for row in rows[:limit]:
+                results.append(dict(zip(columns, row)))
+
+            return {
+                "status": "success",
+                "columns": columns,
+                "rows": results,
+                "total_count": len(rows),
+                "returned_count": len(results)
+            }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Query execution failed: {str(e)}")
+
+
+@app.get("/source-db-status")
+async def source_db_status():
+    return {
+        "connected": SOURCE_DB_CONN is not None and not SOURCE_DB_CONN.closed,
+        "database_url": mask_url(SOURCE_DB_URL) if SOURCE_DB_URL else None
+    }
+
+
+def mask_url(url: str) -> str:
+    try:
+        parsed = urlparse(url)
+        return f"{parsed.scheme}://{parsed.username}:***@{parsed.hostname}:{parsed.port or 5432}{parsed.path}"
+    except:
+        return url[:30] + "..." if len(url) > 30 else url
 
 
 # ----------------------------
