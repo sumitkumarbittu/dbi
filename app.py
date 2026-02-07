@@ -407,64 +407,6 @@ async def create_table_api(payload: dict):
             await conn.close()
 
 
-@app.post("/execute-query")
-async def execute_query(payload: dict):
-    source_db_url = payload.get("source_db_url")
-    query = payload.get("query")
-
-    if not source_db_url:
-        raise HTTPException(status_code=400, detail="source_db_url is required")
-    if not query:
-        raise HTTPException(status_code=400, detail="query is required")
-
-    # Basic safety check - strictly read-only is hard to enforce perfectly without
-    # parsing, but we can prevent obvious destructive commands if desired.
-    # For now, we assume the user knows what they are doing or the DB user has limited perms.
-    # However, to be "production grade", maybe we should warn or try to use a read-only transaction.
-    
-    conn = None
-    try:
-        conn = await psycopg.AsyncConnection.connect(source_db_url)
-        async with conn.cursor() as cur:
-            await cur.execute(query)
-            
-            if cur.description:
-                columns = [col.name for col in cur.description]
-                rows = await cur.fetchall()
-                
-                # Convert rows to JSON-serializable format
-                formatted_rows = []
-                for row in rows:
-                    formatted_row = []
-                    for val in row:
-                        if val is None:
-                            formatted_row.append(None)
-                        else:
-                            # Convert everything else to string to mimic CSV behavior
-                            # and avoid JSON serialization issues with Dates/Decimals
-                            formatted_row.append(str(val))
-                    formatted_rows.append(formatted_row)
-                    
-                return {
-                    "columns": columns,
-                    "rows": formatted_rows,
-                    "count": len(rows)
-                }
-            else:
-                return {
-                    "columns": [],
-                    "rows": [],
-                    "message": "Query executed successfully (no results)"
-                }
-
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    finally:
-        if conn:
-            await conn.close()
-
-
 
 
 
