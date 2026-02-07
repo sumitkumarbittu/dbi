@@ -382,7 +382,7 @@ async def upload_data(
     background_tasks: BackgroundTasks,
     table: str = Form(...),
     columns: str = Form(...),
-    primary_key: str = Form(...),
+    primary_key: str = Form(""),
     file: UploadFile = File(...)
 ):
     columns_list = parse_list(columns)
