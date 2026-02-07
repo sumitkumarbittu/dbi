@@ -1842,6 +1842,80 @@ async function executeSourceQuery() {
     }
 }
 
+async function startServerTransfer() {
+    if (!sourceDbConnected) {
+        showNotification('Please connect to source database first', 'error');
+        return;
+    }
+    if (!tableSchema || !Array.isArray(tableSchema.attributes) || tableSchema.attributes.length === 0) {
+        showNotification('Load Target Table Schema first (above)', 'error');
+        scrollToCard('card-table-schema');
+        return;
+    }
+
+    const query = document.getElementById('sourceDbQuery')?.value?.trim();
+    if (!query) {
+        showNotification('Please enter a SQL query', 'error');
+        return;
+    }
+
+    const chunkSizeRaw = document.getElementById('transferChunkSize')?.value;
+    const chunkSize = Math.max(1, Math.min(100000, parseInt(chunkSizeRaw || '5000', 10) || 5000));
+
+    const mapping = getActiveColumnMapping() || {};
+    const targetAttrs = tableSchema.attributes;
+    const mappedTargetCols = targetAttrs.filter(a => {
+        const m = mapping[a];
+        return m && m !== '' && m !== '__AUTO__';
+    });
+
+    if (mappedTargetCols.length === 0) {
+        showNotification('Please map at least one target attribute (Mapping card)', 'error');
+        scrollToCard('card-mapping');
+        return;
+    }
+
+    const payload = {
+        query,
+        target_table: tableSchema.table,
+        target_columns: mappedTargetCols,
+        source_to_target_mapping: Object.fromEntries(mappedTargetCols.map(t => [t, mapping[t] || t])),
+        primary_key: Array.isArray(tableSchema.primary_key) ? tableSchema.primary_key : [],
+        chunk_size: chunkSize,
+        on_conflict_do_nothing: true
+    };
+
+    const btn = document.getElementById('startTransferBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '⏳ Starting...';
+    }
+
+    try {
+        const res = await fetch(`${renderApiUrl}/transfer/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok) {
+            showNotification('Transfer started!', 'info');
+            createJobCard(data.job_id, `Server Transfer → ${tableSchema.table}`);
+            monitorJobCard(data.job_id);
+            scrollToCard('card-uploads');
+        } else {
+            showNotification('Error: ' + errorToString(data.detail), 'error');
+        }
+    } catch (err) {
+        showNotification('Error: ' + err.message, 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '🚚 Server Transfer';
+        }
+    }
+}
+
 function renderQueryResults() {
     const section = document.getElementById('queryResultsSection');
     const table = document.getElementById('queryResultsTable');
