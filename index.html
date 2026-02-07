@@ -49,6 +49,58 @@
             </div>
         </div>
 
+        <!-- CARD 3: Create Table -->
+        <div class="card" id="card-create-table">
+            <div class="card-title" style="justify-content: space-between;">
+                <span>⚡ Create Table</span>
+                <button class="btn btn-secondary btn-sm" onclick="toggleCreateTableCard()"><span id="createTableToggleBtnText">Create Table</span></button>
+            </div>
+            <div id="createTableBody" class="hidden">
+                <div class="input-group">
+                    <label>SQL Schema Definition</label>
+                    <textarea id="createTableSql" placeholder="CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);"></textarea>
+                </div>
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="executeCreateTable()">⚡ Create</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 4: Table Schema Info -->
+        <div class="card" id="card-table-schema">
+            <div class="card-title">📊 Target Table Schema</div>
+            <div class="input-group">
+                <label>Table Name</label>
+                <div class="input-wrapper">
+                    <input type="text" id="tableName" placeholder="Enter table name">
+                    <button class="btn btn-primary" onclick="fetchTableSchema()">🔍 Load Schema</button>
+                </div>
+            </div>
+
+            <div class="schema-display hidden" id="schemaInfo">
+                <div class="schema-header">
+                    <h4 id="schemaTableName">-</h4>
+                    <span class="schema-badge" id="schemaStatus">Not Loaded</span>
+                </div>
+                <div class="info-grid">
+                    <div class="info-box primary">
+                        <label>🔑 Primary Key</label>
+                        <div class="value" id="primaryKey">-</div>
+                    </div>
+                    <div class="info-box">
+                        <label>📦 Attributes</label>
+                        <div class="value" id="attributesCount">0</div>
+                    </div>
+                </div>
+                <div class="attributes-list" id="attributes"></div>
+            </div>
+        </div>
+
         <!-- CARD 2: Data Source (DB/CSV/JSON) with Advanced Preview -->
         <div class="card" id="card-data-source">
             <div class="card-title">📥 Data Source Loader</div>
@@ -67,8 +119,17 @@
             <div id="dbSourceSection" class="source-section">
                 <div class="input-group">
                     <label>Source Database URL</label>
-                    <div class="input-wrapper">
+                    <div id="sourceDbUrlDisplay" class="hidden">
+                        <div class="db-url-display">
+                            <span id="sourceDbUrlText">Not configured</span>
+                            <button class="btn btn-icon btn-secondary" onclick="editSourceDbUrl()">✏️</button>
+                        </div>
+                    </div>
+                    <div class="input-wrapper" id="sourceDbUrlInput">
                         <input type="text" id="sourceDbUrl" placeholder="postgresql://user:password@host:port/database">
+                        <button class="btn btn-secondary" onclick="saveSourceDbConnection()">💾 Save</button>
+                    </div>
+                    <div class="button-group" style="margin-top: 10px;">
                         <button class="btn btn-primary" id="connectSourceDbBtn" onclick="connectSourceDb(event)">🔗 Connect</button>
                     </div>
                 </div>
@@ -214,61 +275,6 @@
             </div>
         </div>
 
-        <!-- CARD 3: Create Table -->
-        <div class="card" id="card-create-table">
-            <div class="card-title" style="justify-content: space-between;">
-                <span>⚡ Create Table</span>
-                <button class="btn btn-secondary btn-sm" onclick="toggleCreateTableCard()"><span id="createTableToggleBtnText">Create Table</span></button>
-            </div>
-            <div id="createTableBody" class="hidden">
-                <div class="input-group">
-                    <label>SQL Schema Definition</label>
-                    <textarea id="createTableSql" placeholder="CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    email VARCHAR(100) UNIQUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);"></textarea>
-                </div>
-                <div class="button-group">
-                    <button class="btn btn-primary" onclick="executeCreateTable()">⚡ Create</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- CARD 4: Table Schema Info -->
-        <div class="card" id="card-table-schema">
-            <div class="card-title">📊 Target Table Schema</div>
-            <div class="input-group">
-                <label>Table Name</label>
-                <div class="input-wrapper">
-                    <input type="text" id="tableName" placeholder="Enter table name">
-                    <button class="btn btn-primary" onclick="fetchTableSchema()">🔍 Load Schema</button>
-                </div>
-            </div>
-
-            <div class="schema-display hidden" id="schemaInfo">
-                <div class="schema-header">
-                    <h4 id="schemaTableName">-</h4>
-                    <span class="schema-badge" id="schemaStatus">Not Loaded</span>
-                </div>
-                <div class="info-grid">
-                    <div class="info-box primary">
-                        <label>🔑 Primary Key</label>
-                        <div class="value" id="primaryKey">-</div>
-                    </div>
-                    <div class="info-box">
-                        <label>📋 Total Attributes</label>
-                        <div class="value" id="attributesCount">-</div>
-                    </div>
-                </div>
-                <div class="attributes-list">
-                    <label>📑 All Attributes</label>
-                    <div class="attributes-tags" id="attributes">-</div>
-                </div>
-            </div>
-        </div>
-
         <!-- CARD 5: Verify & Advanced Mapping -->
         <div class="card hidden" id="card-mapping">
             <div class="card-title">🔄 Attribute Mapping & Verification</div>
@@ -353,50 +359,55 @@
         <div class="card" id="card-uploads">
             <div class="card-title" style="justify-content: space-between;">
                 <span>📤 Uploads & Job Status</span>
-                <button class="btn btn-secondary btn-sm" onclick="refreshRecentJobs()">🔄 Refresh</button>
-            </div>
-            
-            <!-- Job Search -->
-            <div class="job-search-section">
-                <div class="input-wrapper">
-                    <input type="text" id="jobSearchInput" placeholder="Search by Job ID..." onkeyup="searchJobs()">
-                    <button class="btn btn-secondary" onclick="searchJobs()">🔍 Search</button>
-                    <button class="btn btn-secondary" onclick="clearJobSearch()">Clear</button>
-                </div>
-                <div class="job-filters">
-                    <button class="filter-btn active" onclick="filterJobs('all')" id="filterAll">All</button>
-                    <button class="filter-btn" onclick="filterJobs('processing')" id="filterProcessing">Processing</button>
-                    <button class="filter-btn" onclick="filterJobs('completed')" id="filterCompleted">Completed</button>
-                    <button class="filter-btn" onclick="filterJobs('failed')" id="filterFailed">Failed</button>
+                <div style="display:flex; gap: 10px; align-items:center;">
+                    <button class="btn btn-secondary btn-sm" onclick="toggleUploadsCard()" id="uploadsToggleBtn">Hide</button>
+                    <button class="btn btn-secondary btn-sm" onclick="refreshRecentJobs()">🔄 Refresh</button>
                 </div>
             </div>
 
-            <!-- Job Stats -->
-            <div class="job-stats-bar">
-                <div class="stat-item">
-                    <span class="stat-value" id="totalJobs">0</span>
-                    <span class="stat-label">Total</span>
+            <div id="uploadsBody">
+                <!-- Job Search -->
+                <div class="job-search-section">
+                    <div class="input-wrapper">
+                        <input type="text" id="jobSearchInput" placeholder="Search by Job ID..." onkeyup="searchJobs()">
+                        <button class="btn btn-secondary" onclick="searchJobs()">🔍 Search</button>
+                        <button class="btn btn-secondary" onclick="clearJobSearch()">Clear</button>
+                    </div>
+                    <div class="job-filters">
+                        <button class="filter-btn active" onclick="filterJobs('all')" id="filterAll">All</button>
+                        <button class="filter-btn" onclick="filterJobs('processing')" id="filterProcessing">Processing</button>
+                        <button class="filter-btn" onclick="filterJobs('completed')" id="filterCompleted">Completed</button>
+                        <button class="filter-btn" onclick="filterJobs('failed')" id="filterFailed">Failed</button>
+                    </div>
                 </div>
-                <div class="stat-item">
-                    <span class="stat-value" id="processingJobs">0</span>
-                    <span class="stat-label">Processing</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-value" id="completedJobs">0</span>
-                    <span class="stat-label">Completed</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-value" id="failedJobs">0</span>
-                    <span class="stat-label">Failed</span>
-                </div>
-            </div>
 
-            <!-- Job Cards Container -->
-            <div id="jobCardsContainer" class="job-cards-container">
-                <div class="empty-state" id="emptyJobsState">
-                    <div class="empty-icon">📭</div>
-                    <p>No active uploads</p>
-                    <p class="empty-subtitle">Upload data to see job status here</p>
+                <!-- Job Stats -->
+                <div class="job-stats-bar">
+                    <div class="stat-item">
+                        <span class="stat-value" id="totalJobs">0</span>
+                        <span class="stat-label">Total</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="processingJobs">0</span>
+                        <span class="stat-label">Processing</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="completedJobs">0</span>
+                        <span class="stat-label">Completed</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="failedJobs">0</span>
+                        <span class="stat-label">Failed</span>
+                    </div>
+                </div>
+
+                <!-- Job Cards Container -->
+                <div id="jobCardsContainer" class="job-cards-container">
+                    <div class="empty-state" id="emptyJobsState">
+                        <div class="empty-icon">📭</div>
+                        <p>No active uploads</p>
+                        <p class="empty-subtitle">Upload data to see job status here</p>
+                    </div>
                 </div>
             </div>
         </div>

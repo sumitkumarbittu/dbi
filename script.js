@@ -6,6 +6,7 @@ const API_CONFIGS = {
 let selectedApi = 'B';
 let renderApiUrl = API_CONFIGS['B'];
 let currentDbUrl = '';
+let currentSourceDbUrl = '';
 let tableSchema = null;
 let selectedFile = null;
 let csvHeader = [];
@@ -20,6 +21,71 @@ let jobCardOrder = [];
 function getActiveColumnMapping() {
     if (currentDataSource) return currentDataSource.columnMapping;
     return columnMapping;
+}
+
+function scrollToCard(cardId) {
+    const el = document.getElementById(cardId);
+    if (!el) return;
+    try {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch {
+        // no-op
+    }
+}
+
+function toggleUploadsCard() {
+    const card = document.getElementById('card-uploads');
+    const btn = document.getElementById('uploadsToggleBtn');
+    if (!card || !btn) return;
+    const nextCollapsed = !card.classList.contains('collapsed');
+    card.classList.toggle('collapsed', nextCollapsed);
+    btn.textContent = nextCollapsed ? 'Show' : 'Hide';
+    try {
+        localStorage.setItem('uploadsCollapsed', nextCollapsed ? '1' : '0');
+    } catch {
+        // ignore
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const card = document.getElementById('card-uploads');
+    const btn = document.getElementById('uploadsToggleBtn');
+    if (!card || !btn) return;
+    let collapsed = false;
+    try {
+        const stored = localStorage.getItem('uploadsCollapsed');
+        collapsed = stored === null ? true : stored === '1';
+    } catch {
+        collapsed = true;
+    }
+    card.classList.toggle('collapsed', collapsed);
+    btn.textContent = collapsed ? 'Show' : 'Hide';
+});
+
+function saveSourceDbConnection() {
+    const url = document.getElementById('sourceDbUrl')?.value?.trim();
+    if (!url) {
+        showNotification('Please enter a source database URL', 'error');
+        return;
+    }
+    currentSourceDbUrl = url;
+    try {
+        localStorage.setItem('sourceDbUrl', url);
+    } catch {
+        // ignore
+    }
+
+    const textEl = document.getElementById('sourceDbUrlText');
+    if (textEl) textEl.textContent = maskUrl(url);
+    document.getElementById('sourceDbUrlDisplay')?.classList.remove('hidden');
+    document.getElementById('sourceDbUrlInput')?.classList.add('hidden');
+}
+
+function editSourceDbUrl() {
+    document.getElementById('sourceDbUrlDisplay')?.classList.add('hidden');
+    document.getElementById('sourceDbUrlInput')?.classList.remove('hidden');
+    const input = document.getElementById('sourceDbUrl');
+    if (input) input.value = currentSourceDbUrl;
 }
 
 async function refreshJobStatus(jobId) {
@@ -660,6 +726,7 @@ async function executeCreateTable() {
         if (res.ok) {
             showNotification('Table created successfully!', 'success');
             document.getElementById('createTableSql').value = '';
+            scrollToCard('card-table-schema');
         } else {
             showNotification('Error: ' + errorToString(data.detail), 'error');
         }
@@ -712,7 +779,14 @@ async function fetchTableSchema() {
                 schemaStatusEl.classList.add('loaded');
             }
 
+            const queryEl = document.getElementById('sourceDbQuery');
+            if (queryEl && !queryEl.value.trim()) {
+                const t = (data.table || table).trim();
+                if (t) queryEl.value = `SELECT * FROM ${t};`;
+            }
+
             showNotification('Schema loaded!', 'success');
+            scrollToCard('card-data-source');
 
             // If we already have a loaded source (CSV/JSON/DB), refresh mapping UI for the new schema.
             const activeSourceFields = getCurrentSourceFields();
@@ -1319,12 +1393,12 @@ function createJobCard(jobId, fileName) {
 
 function updateJobCardStack() {
     const container = document.getElementById('jobCardsContainer');
-    const isStacked = window.innerWidth > 640;
-    container.classList.toggle('stacked', isStacked);
-
     const cards = jobCardOrder
         .map(id => document.getElementById(`job-card-${id}`))
         .filter(Boolean);
+
+    const isStacked = window.innerWidth > 640 && cards.length > 0 && cards.length <= 3;
+    container.classList.toggle('stacked', isStacked);
 
     if (!isStacked) {
         container.style.minHeight = '0px';
@@ -1470,7 +1544,7 @@ function formatBytes(bytes) {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 
-function showNotification(message, type) {
+function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
     notification.textContent = message;
@@ -1547,6 +1621,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     refreshRecentJobs();
 
+    try {
+        const storedSource = localStorage.getItem('sourceDbUrl') || '';
+        if (storedSource) {
+            currentSourceDbUrl = storedSource;
+            const textEl = document.getElementById('sourceDbUrlText');
+            if (textEl) textEl.textContent = maskUrl(storedSource);
+            document.getElementById('sourceDbUrlDisplay')?.classList.remove('hidden');
+            document.getElementById('sourceDbUrlInput')?.classList.add('hidden');
+        }
+    } catch {
+        // ignore
+    }
+
     // Check if running from file:// protocol
     if (isFileProtocol()) {
         console.error('WARNING: Running from file:// protocol. API calls will fail.');
@@ -1612,7 +1699,8 @@ function setSourceType(type) {
 // DB Source Functions
 // ============================
 async function connectSourceDb(evt) {
-    const url = document.getElementById('sourceDbUrl').value.trim();
+    const inputEl = document.getElementById('sourceDbUrl');
+    const url = (inputEl?.value?.trim() || currentSourceDbUrl || '').trim();
     if (!url) {
         showNotification('Please enter a database URL', 'error');
         return;
@@ -1647,6 +1735,16 @@ async function connectSourceDb(evt) {
             document.getElementById('sourceDbStatus').classList.remove('hidden');
             document.getElementById('sourceDbStatusText').textContent = `Connected: ${data.database_url}`;
             document.getElementById('executeQueryBtn').disabled = false;
+            currentSourceDbUrl = url;
+            try {
+                localStorage.setItem('sourceDbUrl', url);
+            } catch {
+                // ignore
+            }
+            const textEl = document.getElementById('sourceDbUrlText');
+            if (textEl) textEl.textContent = maskUrl(url);
+            document.getElementById('sourceDbUrlDisplay')?.classList.remove('hidden');
+            document.getElementById('sourceDbUrlInput')?.classList.add('hidden');
             showNotification('Source database connected!', 'success');
         } else {
             sourceDbConnected = false;
@@ -1714,6 +1812,15 @@ async function executeSourceQuery() {
             queryColumns = data.columns;
             renderQueryResults();
             showNotification(`Query executed! ${data.total_count} rows returned.`, 'success');
+
+            // Workflow: schema -> data source -> mapping
+            if (!tableSchema || !Array.isArray(tableSchema.attributes) || tableSchema.attributes.length === 0) {
+                showNotification('Load Target Table Schema first (above) to enable mapping and upload', 'info');
+                scrollToCard('card-table-schema');
+            } else {
+                showMappingCard('DB Query', tableSchema.table);
+                autoMapToSchema();
+            }
         } else {
             showNotification('Error: ' + errorToString(data.detail), 'error');
         }
@@ -1799,10 +1906,15 @@ async function verifyCsvFile() {
     }
 
     try {
+        currentDataSource.columnMapping = getActiveColumnMapping();
         await currentDataSource.load(currentDataSource.file);
         currentDataSource.renderPreview('csvPreviewTable', 'csvPreviewRange', 'csvSelectedCounter');
         document.getElementById('csvPreviewCard').classList.remove('hidden');
-        if (tableSchema) {
+
+        if (!tableSchema || !Array.isArray(tableSchema.attributes) || tableSchema.attributes.length === 0) {
+            showNotification('Load Target Table Schema first (above) to enable mapping and upload', 'info');
+            scrollToCard('card-table-schema');
+        } else {
             showMappingCard(currentDataSource.name || 'CSV', tableSchema.table);
             autoMapToSchema();
         }
@@ -1884,10 +1996,15 @@ async function verifyJsonFile() {
     }
 
     try {
+        currentDataSource.columnMapping = getActiveColumnMapping();
         await currentDataSource.load(currentDataSource.file);
         currentDataSource.renderPreview('jsonPreviewTable', 'jsonPreviewRange', 'jsonSelectedCounter');
         document.getElementById('jsonPreviewCard').classList.remove('hidden');
-        if (tableSchema) {
+
+        if (!tableSchema || !Array.isArray(tableSchema.attributes) || tableSchema.attributes.length === 0) {
+            showNotification('Load Target Table Schema first (above) to enable mapping and upload', 'info');
+            scrollToCard('card-table-schema');
+        } else {
             showMappingCard(currentDataSource.name || 'JSON', tableSchema.table);
             autoMapToSchema();
         }
@@ -2055,6 +2172,7 @@ function showMappingCard(sourceName, targetTable) {
     document.getElementById('card-mapping').classList.remove('hidden');
     document.getElementById('mappingSourceName').textContent = sourceName;
     document.getElementById('mappingTargetTable').textContent = targetTable;
+    scrollToCard('card-mapping');
 }
 
 function autoMapAttributes() {
@@ -2144,6 +2262,7 @@ function getAllMappings() {
 function showPreviewCard() {
     document.getElementById('card-preview').classList.remove('hidden');
     renderAdvancedPreview();
+    scrollToCard('card-preview');
 }
 
 function setPreviewTab(tab) {
@@ -2163,15 +2282,20 @@ function renderAdvancedPreview() {
     if (!table) return;
     
     let data, headers, selectedSet;
+    const pageSize = 10;
+    let offset = 0;
     
     if (currentDataSource && currentDataSource.isLoaded) {
         data = currentDataSource.data;
         headers = currentDataSource.header;
         selectedSet = currentDataSource.selectedRows;
+        offset = Math.max(0, Number(currentDataSource.previewOffset) || 0);
     } else if (currentSourceType === 'db') {
         data = queryResults || [];
         headers = queryColumns || [];
         selectedSet = new Set(data.filter(r => r._selected).map((_, i) => i));
+        if (!Number.isFinite(window.dbPreviewOffset)) window.dbPreviewOffset = 0;
+        offset = Math.max(0, window.dbPreviewOffset);
     } else {
         table.innerHTML = '<tr><td>No data to preview</td></tr>';
         return;
@@ -2184,7 +2308,11 @@ function renderAdvancedPreview() {
     
     const headerHtml = `<tr><th style="width: 30px;"><input type="checkbox" onchange="toggleSelectAllPreview()"></th>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
     
-    const bodyHtml = data.slice(0, 50).map((row, idx) => {
+    const start = Math.min(offset, Math.max(data.length - 1, 0));
+    const end = Math.min(start + pageSize, data.length);
+
+    const bodyHtml = data.slice(start, end).map((row, rowIdx) => {
+        const idx = start + rowIdx;
         const isSelected = selectedSet.has(idx);
         const rowData = headers.map(h => {
             let val;
@@ -2204,7 +2332,7 @@ function renderAdvancedPreview() {
     
     table.innerHTML = `<thead>${headerHtml}</thead><tbody>${bodyHtml}</tbody>`;
     
-    document.getElementById('sourcePreviewStats').textContent = `Showing ${Math.min(50, data.length)} of ${data.length} rows`;
+    document.getElementById('sourcePreviewStats').textContent = `Showing ${data.length === 0 ? 0 : start + 1}-${end} of ${data.length} rows`;
     document.getElementById('sourceSelectedStats').textContent = `${selectedSet.size} selected`;
 }
 
@@ -2287,12 +2415,14 @@ function togglePreviewRow(idx) {
         queryResults[idx]._selected = !queryResults[idx]._selected;
     }
     renderAdvancedPreview();
+    renderMatchedPreview();
 }
 
 function selectAllPreviewRows() {
     if (currentDataSource && currentDataSource.isLoaded) {
         currentDataSource.selectAllRows();
         renderAdvancedPreview();
+        renderMatchedPreview();
     } else {
         showNotification('Select all not implemented for this source type', 'info');
     }
@@ -2305,14 +2435,41 @@ function clearPreviewSelection() {
         queryResults.forEach(r => r._selected = false);
     }
     renderAdvancedPreview();
+    renderMatchedPreview();
 }
 
 function previewPrev() {
-    showNotification('Previous page', 'info');
+    if (currentDataSource && currentDataSource.isLoaded) {
+        currentDataSource.previewOffset = Math.max((Number(currentDataSource.previewOffset) || 0) - 10, 0);
+        renderAdvancedPreview();
+        renderMatchedPreview();
+        return;
+    }
+    if (currentSourceType === 'db') {
+        window.dbPreviewOffset = Math.max((Number(window.dbPreviewOffset) || 0) - 10, 0);
+        renderAdvancedPreview();
+        renderMatchedPreview();
+        return;
+    }
+    showNotification('No data to preview', 'info');
 }
 
 function previewNext() {
-    showNotification('Next page', 'info');
+    if (currentDataSource && currentDataSource.isLoaded) {
+        const maxOffset = Math.max((currentDataSource.data?.length || 0) - 10, 0);
+        currentDataSource.previewOffset = Math.min((Number(currentDataSource.previewOffset) || 0) + 10, maxOffset);
+        renderAdvancedPreview();
+        renderMatchedPreview();
+        return;
+    }
+    if (currentSourceType === 'db') {
+        const maxOffset = Math.max((queryResults?.length || 0) - 10, 0);
+        window.dbPreviewOffset = Math.min((Number(window.dbPreviewOffset) || 0) + 10, maxOffset);
+        renderAdvancedPreview();
+        renderMatchedPreview();
+        return;
+    }
+    showNotification('No data to preview', 'info');
 }
 
 function uploadToDatabase() {
@@ -2384,6 +2541,7 @@ async function uploadFormData(formData, label) {
             monitorJobCard(data.job_id);
             updateJobStats();
             showNotification('Upload started!', 'success');
+            scrollToCard('card-uploads');
         } else {
             showNotification('Error: ' + errorToString(data.detail), 'error');
         }
