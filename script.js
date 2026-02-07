@@ -786,6 +786,7 @@ async function fetchTableSchema() {
             }
 
             showNotification('Schema loaded!', 'success');
+            updateTransferUiState();
             scrollToCard('card-data-source');
 
             // If we already have a loaded source (CSV/JSON/DB), refresh mapping UI for the new schema.
@@ -796,6 +797,8 @@ async function fetchTableSchema() {
             }
         } else {
             tableSchema = null;
+
+            updateTransferUiState();
 
             const schemaInfoEl = document.getElementById('schemaInfo');
             if (schemaInfoEl) schemaInfoEl.classList.add('hidden');
@@ -810,6 +813,8 @@ async function fetchTableSchema() {
         }
     } catch (err) {
         tableSchema = null;
+
+        updateTransferUiState();
 
         const schemaInfoEl = document.getElementById('schemaInfo');
         if (schemaInfoEl) schemaInfoEl.classList.add('hidden');
@@ -1676,6 +1681,13 @@ let sourceDbConnected = false;
 let queryResults = null;
 let queryColumns = [];
 
+function updateTransferUiState() {
+    const btn = document.getElementById('startTransferBtn');
+    if (!btn) return;
+    const schemaLoaded = !!(tableSchema && Array.isArray(tableSchema.attributes) && tableSchema.attributes.length > 0);
+    btn.disabled = !(sourceDbConnected && schemaLoaded);
+}
+
 function setSourceType(type) {
     currentSourceType = type;
 
@@ -1693,12 +1705,14 @@ function setSourceType(type) {
     if (currentDataSource && currentDataSource.type !== type) {
         currentDataSource = null;
     }
+
+    updateTransferUiState();
 }
 
 // ============================
 // DB Source Functions
 // ============================
-async function connectSourceDb(evt) {
+async function connectSourceDb(event) {
     const inputEl = document.getElementById('sourceDbUrl');
     const url = (inputEl?.value?.trim() || currentSourceDbUrl || '').trim();
     if (!url) {
@@ -1706,7 +1720,7 @@ async function connectSourceDb(evt) {
         return;
     }
 
-    const connectBtn = (evt && evt.target) ? evt.target : document.getElementById('connectSourceDbBtn');
+    const connectBtn = (event && event.target) ? event.target : document.getElementById('connectSourceDbBtn');
     if (!connectBtn) {
         showNotification('Connect button not found', 'error');
         return;
@@ -1735,6 +1749,7 @@ async function connectSourceDb(evt) {
             document.getElementById('sourceDbStatus').classList.remove('hidden');
             document.getElementById('sourceDbStatusText').textContent = `Connected: ${data.database_url}`;
             document.getElementById('executeQueryBtn').disabled = false;
+            updateTransferUiState();
             currentSourceDbUrl = url;
             try {
                 localStorage.setItem('sourceDbUrl', url);
@@ -1750,6 +1765,7 @@ async function connectSourceDb(evt) {
             sourceDbConnected = false;
             document.getElementById('sourceDbStatus').classList.add('hidden');
             document.getElementById('executeQueryBtn').disabled = true;
+            updateTransferUiState();
             showNotification('Error: ' + errorToString(data.detail), 'error');
         }
     } catch (err) {
@@ -1759,6 +1775,7 @@ async function connectSourceDb(evt) {
         sourceDbConnected = false;
         document.getElementById('sourceDbStatus').classList.add('hidden');
         document.getElementById('executeQueryBtn').disabled = true;
+        updateTransferUiState();
 
         let errorMsg = 'Network Error: ' + err.message;
         if (isFileProtocol()) {
@@ -1892,7 +1909,8 @@ async function startServerTransfer() {
     }
 
     try {
-        const res = await fetch(`${renderApiUrl}/transfer/start`, {
+        const transferUrl = `${renderApiUrl}/transfer/start`;
+        const res = await fetch(transferUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -1904,7 +1922,11 @@ async function startServerTransfer() {
             monitorJobCard(data.job_id);
             scrollToCard('card-uploads');
         } else {
-            showNotification('Error: ' + errorToString(data.detail), 'error');
+            if (res.status === 404) {
+                showNotification(`Error 404: ${transferUrl} not found. Wrong API base selected or backend not redeployed.`, 'error');
+            } else {
+                showNotification(`Error ${res.status}: ` + errorToString(data.detail), 'error');
+            }
         }
     } catch (err) {
         showNotification('Error: ' + err.message, 'error');

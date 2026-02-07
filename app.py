@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -16,9 +18,11 @@ app = FastAPI()
 # ----------------------------
 # CORS
 # ----------------------------
+_cors_origins_raw = os.getenv("CORS_ALLOW_ORIGINS", "*")
+_cors_origins = [o.strip() for o in _cors_origins_raw.split(",") if o.strip()] if _cors_origins_raw != "*" else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -557,7 +561,7 @@ async def health():
 
 
 @app.post("/transfer/start")
-async def start_transfer(req: "TransferStartRequest", background_tasks: BackgroundTasks):
+async def start_transfer(req: TransferStartRequest, background_tasks: BackgroundTasks):
     purge_jobs()
     job_id = generate_job_id()
     now = utc_now()
