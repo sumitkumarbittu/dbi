@@ -520,10 +520,13 @@ async def execute_query(payload: dict):
             rows = await cur.fetchall()
             columns = [desc[0] for desc in cur.description] if cur.description else []
 
-            # Convert to list of dicts
+            # Convert to list of dicts, handling binary data
             results = []
             for row in rows[:limit]:
-                results.append(dict(zip(columns, row)))
+                row_dict = {}
+                for col, val in zip(columns, row):
+                    row_dict[col] = serialize_value(val)
+                results.append(row_dict)
 
             return {
                 "status": "success",
@@ -534,6 +537,21 @@ async def execute_query(payload: dict):
             }
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Query execution failed: {str(e)}")
+
+
+def serialize_value(val):
+    """Convert Python values to JSON-serializable format, handling bytes."""
+    if val is None:
+        return None
+    if isinstance(val, bytes):
+        # Convert bytes to base64 string
+        import base64
+        return f"base64:{base64.b64encode(val).decode('ascii')}"
+    if isinstance(val, (list, tuple)):
+        return [serialize_value(v) for v in val]
+    if isinstance(val, dict):
+        return {k: serialize_value(v) for k, v in val.items()}
+    return val
 
 
 @app.get("/source-db-status")
