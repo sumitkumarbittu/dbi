@@ -22,13 +22,14 @@
                 <div class="api-label">API Base:</div>
                 <div class="api-boxes" id="apiBoxes"></div>
             </div>
+            <div id="renderUrlText"></div>
         </div>
 
-        <!-- Database Connection -->
-        <div class="card">
-            <div class="card-title">🔌 Database Connection</div>
+        <!-- CARD 1: Target Database Connection -->
+        <div class="card" id="card-target-db">
+            <div class="card-title">🔌 Target Database Connection</div>
             <div class="input-group" id="dbUrlGroup">
-                <label>PostgreSQL Connection URL</label>
+                <label>Target PostgreSQL Connection URL</label>
                 <div id="dbUrlDisplay" class="hidden">
                     <div class="db-url-display">
                         <span id="dbUrlText">Not configured</span>
@@ -40,119 +41,365 @@
                     <button class="btn btn-primary" onclick="saveDbConnection()">💾 Save</button>
                 </div>
             </div>
+            <div id="targetDbStatus" class="connection-status hidden">
+                <div class="status-indicator connected">
+                    <span class="status-icon">✓</span>
+                    <span id="targetDbStatusText">Connected to target database</span>
+                </div>
+            </div>
         </div>
 
-        <!-- Create Table -->
-        <div class="card">
-            <div class="card-title">
-                📋 Table Management
-                <button class="btn btn-secondary" style="margin-left: auto;" onclick="toggleCreateTable()">
-                    <span id="createTableBtnText">➕ Create Table</span>
-                </button>
+        <!-- CARD 2: Data Source (DB/CSV/JSON) with Advanced Preview -->
+        <div class="card" id="card-data-source">
+            <div class="card-title">📥 Data Source Loader</div>
+            
+            <!-- Source Type Toggler -->
+            <div class="source-toggler">
+                <div class="source-label">Select Source:</div>
+                <div class="source-options">
+                    <button class="source-btn active" id="btnSourceDb" onclick="setSourceType('db')">🗄️ Database</button>
+                    <button class="source-btn" id="btnSourceCsv" onclick="setSourceType('csv')">📄 CSV</button>
+                    <button class="source-btn" id="btnSourceJson" onclick="setSourceType('json')">📋 JSON</button>
+                </div>
             </div>
 
-            <div class="schema-section hidden" id="schemaSection">
+            <!-- DB Source Section -->
+            <div id="dbSourceSection" class="source-section">
                 <div class="input-group">
-                    <label>SQL Schema</label>
+                    <label>Source Database URL</label>
+                    <div class="input-wrapper">
+                        <input type="text" id="sourceDbUrl" placeholder="postgresql://user:password@host:port/database">
+                        <button class="btn btn-primary" id="connectSourceDbBtn" onclick="connectSourceDb(event)">🔗 Connect</button>
+                    </div>
+                </div>
+
+                <div id="sourceDbStatus" class="connection-status hidden">
+                    <div class="status-indicator connected">
+                        <span class="status-icon">✓</span>
+                        <span id="sourceDbStatusText">Connected</span>
+                    </div>
+                </div>
+
+                <div class="input-group" id="querySection">
+                    <label>SQL Query</label>
+                    <textarea id="sourceDbQuery" placeholder="SELECT * FROM users LIMIT 100;"></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="executeSourceQuery()" id="executeQueryBtn" disabled>▶️ Execute Query</button>
+
+                <!-- Advanced Query Results Preview -->
+                <div id="queryResultsSection" class="hidden advanced-preview-section">
+                    <div class="preview-header">
+                        <div>
+                            <strong>📊 Query Results Preview</strong>
+                            <div class="preview-stats">
+                                <span id="queryResultCount">0 rows</span>
+                                <span id="queryResultColumns">0 columns</span>
+                            </div>
+                        </div>
+                        <div class="preview-actions">
+                            <button class="btn btn-secondary" onclick="selectAllQueryRows()">Select All</button>
+                            <button class="btn btn-secondary" onclick="clearQuerySelection()">Clear</button>
+                        </div>
+                    </div>
+                    <div class="query-results-container">
+                        <table class="preview-table" id="queryResultsTable"></table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CSV Source Section -->
+            <div id="csvSourceSection" class="source-section hidden">
+                <div class="upload-zone" id="csvUploadZone" onclick="document.getElementById('csvFileInput').click()">
+                    <div class="upload-icon">📁</div>
+                    <h3>Drop CSV file here or click to browse</h3>
+                    <p class="upload-subtitle">Supports CSV files with advanced preview</p>
+                </div>
+                <input type="file" id="csvFileInput" accept=".csv" style="display: none;" onchange="handleCsvFileSelect(event)">
+
+                <div id="csvFileInfoSection" class="hidden">
+                    <div class="file-info">
+                        <div class="file-meta">
+                            <strong>📄 Selected:</strong> <span id="csvFileName"></span>
+                            <div class="file-stats">
+                                <span id="csvFileSize"></span>
+                                <span id="csvRowCount"></span>
+                                <span id="csvColCount"></span>
+                            </div>
+                        </div>
+                        <div class="file-actions">
+                            <button class="btn btn-danger" onclick="clearCsvSource()">🗑️ Clear</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="preview-card hidden" id="csvPreviewCard">
+                    <div class="preview-header">
+                        <div>
+                            <strong>CSV Preview</strong>
+                            <div class="preview-stats">
+                                Showing <span id="csvPreviewRange">1-10</span>
+                                <span id="csvSelectedCounter" class="selected-counter hidden">| <span id="csvSelectedCount">0</span> selected</span>
+                            </div>
+                        </div>
+                        <div class="preview-actions">
+                            <button class="btn btn-secondary btn-sm" id="csvPreviewToggleBtn" onclick="toggleCsvPreviewMode()">Raw</button>
+                            <button class="btn btn-secondary btn-sm" onclick="selectAllCsvRows()">Select All</button>
+                            <button class="btn btn-secondary btn-sm" onclick="clearCsvSelection()">Clear</button>
+                            <button class="btn btn-secondary btn-sm" onclick="csvPreviewPrev()">←</button>
+                            <button class="btn btn-secondary btn-sm" onclick="csvPreviewNext()">→</button>
+                        </div>
+                    </div>
+                    <div class="mapping-section" id="csvMappingSection">
+                        <label>Attribute Mapping</label>
+                        <div class="section-subtitle">Map CSV columns to target table attributes</div>
+                        <div id="csvMappingRows"></div>
+                    </div>
+                    <div class="table-scroll-container">
+                        <table class="preview-table" id="csvPreviewTable"></table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- JSON Source Section -->
+            <div id="jsonSourceSection" class="source-section hidden">
+                <div class="upload-zone" id="jsonUploadZone" onclick="document.getElementById('jsonFileInput').click()">
+                    <div class="upload-icon">📁</div>
+                    <h3>Drop JSON file here or click to browse</h3>
+                    <p class="upload-subtitle">Supports JSON files with advanced preview</p>
+                </div>
+                <input type="file" id="jsonFileInput" accept=".json" style="display: none;" onchange="handleJsonFileSelect(event)">
+
+                <div id="jsonFileInfoSection" class="hidden">
+                    <div class="file-info">
+                        <div class="file-meta">
+                            <strong>📋 Selected:</strong> <span id="jsonFileName"></span>
+                            <div class="file-stats">
+                                <span id="jsonFileSize"></span>
+                                <span id="jsonObjectCount"></span>
+                                <span id="jsonKeyCount"></span>
+                            </div>
+                        </div>
+                        <div class="file-actions">
+                            <button class="btn btn-danger" onclick="clearJsonSource()">🗑️ Clear</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="preview-card hidden" id="jsonPreviewCard">
+                    <div class="preview-header">
+                        <div>
+                            <strong>JSON Preview</strong>
+                            <div class="preview-stats">
+                                Showing <span id="jsonPreviewRange">1-10</span>
+                                <span id="jsonSelectedCounter" class="selected-counter hidden">| <span id="jsonSelectedCount">0</span> selected</span>
+                            </div>
+                        </div>
+                        <div class="preview-actions">
+                            <button class="btn btn-secondary btn-sm" id="jsonPreviewToggleBtn" onclick="toggleJsonPreviewMode()">Raw</button>
+                            <button class="btn btn-secondary btn-sm" onclick="selectAllJsonRows()">Select All</button>
+                            <button class="btn btn-secondary btn-sm" onclick="clearJsonSelection()">Clear</button>
+                            <button class="btn btn-secondary btn-sm" onclick="jsonPreviewPrev()">←</button>
+                            <button class="btn btn-secondary btn-sm" onclick="jsonPreviewNext()">→</button>
+                        </div>
+                    </div>
+                    <div class="mapping-section" id="jsonMappingSection">
+                        <label>Attribute Mapping</label>
+                        <div class="section-subtitle">Map JSON keys to target table attributes</div>
+                        <div id="jsonMappingRows"></div>
+                    </div>
+                    <div class="table-scroll-container">
+                        <table class="preview-table" id="jsonPreviewTable"></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 3: Create Table -->
+        <div class="card" id="card-create-table">
+            <div class="card-title" style="justify-content: space-between;">
+                <span>⚡ Create Table</span>
+                <button class="btn btn-secondary btn-sm" onclick="toggleCreateTableCard()"><span id="createTableToggleBtnText">Create Table</span></button>
+            </div>
+            <div id="createTableBody" class="hidden">
+                <div class="input-group">
+                    <label>SQL Schema Definition</label>
                     <textarea id="createTableSql" placeholder="CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    email VARCHAR(100) UNIQUE
+    email VARCHAR(100) UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );"></textarea>
                 </div>
-                <button class="btn btn-primary" onclick="executeCreateTable()">⚡ Execute</button>
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="executeCreateTable()">⚡ Create</button>
+                </div>
             </div>
         </div>
 
-        <!-- Table Schema Info -->
-        <div class="card">
-            <div class="card-title">📊 Table Schema</div>
+        <!-- CARD 4: Table Schema Info -->
+        <div class="card" id="card-table-schema">
+            <div class="card-title">📊 Target Table Schema</div>
             <div class="input-group">
                 <label>Table Name</label>
                 <div class="input-wrapper">
-                    <input type="text" id="tableName" placeholder="users">
-                    <button class="btn btn-primary" onclick="fetchTableSchema()">🔍 Set</button>
+                    <input type="text" id="tableName" placeholder="Enter table name">
+                    <button class="btn btn-primary" onclick="fetchTableSchema()">🔍 Load Schema</button>
                 </div>
             </div>
 
-            <div class="info-grid" id="schemaInfo" style="display: none;">
-                <div class="info-box">
-                    <label>Primary Key</label>
-                    <div class="value" id="primaryKey">-</div>
+            <div class="schema-display hidden" id="schemaInfo">
+                <div class="schema-header">
+                    <h4 id="schemaTableName">-</h4>
+                    <span class="schema-badge" id="schemaStatus">Not Loaded</span>
                 </div>
-                <div class="info-box">
-                    <label>Attributes</label>
-                    <div class="value" id="attributes">-</div>
+                <div class="info-grid">
+                    <div class="info-box primary">
+                        <label>🔑 Primary Key</label>
+                        <div class="value" id="primaryKey">-</div>
+                    </div>
+                    <div class="info-box">
+                        <label>📋 Total Attributes</label>
+                        <div class="value" id="attributesCount">-</div>
+                    </div>
+                </div>
+                <div class="attributes-list">
+                    <label>📑 All Attributes</label>
+                    <div class="attributes-tags" id="attributes">-</div>
                 </div>
             </div>
         </div>
 
-        <!-- File Upload -->
-        <div class="card hidden" id="uploadCard">
-            <div class="card-title">📤 Upload Data</div>
-
-            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
-                <div class="upload-icon">📁</div>
-                <h3>Drop your file here or click to browse</h3>
-                <p style="color: #6b7280; margin-top: 10px;">Supports CSV and JSON files</p>
+        <!-- CARD 5: Verify & Advanced Mapping -->
+        <div class="card hidden" id="card-mapping">
+            <div class="card-title">🔄 Attribute Mapping & Verification</div>
+            <div class="mapping-info">
+                <div class="mapping-source">
+                    <strong>Source:</strong> <span id="mappingSourceName">-</span>
+                </div>
+                <div class="mapping-target">
+                    <strong>Target:</strong> <span id="mappingTargetTable">-</span>
+                </div>
+            </div>
+            
+            <div class="mapping-section" id="advancedMappingSection">
+                <div class="mapping-header">
+                    <div>Source Field</div>
+                    <div>Target Attribute</div>
+                    <div>Action</div>
+                </div>
+                <div id="advancedMappingRows"></div>
             </div>
 
-            <input type="file" id="fileInput" accept=".csv,.json" style="display: none;"
-                onchange="handleFileSelect(event)">
-
-            <div id="fileInfoSection" class="hidden">
-                <div class="file-info">
-                    <div>
-                        <strong>Selected:</strong> <span id="fileName"></span>
-                        <div style="color: #6b7280; font-size: 0.9rem; margin-top: 5px;">
-                            <span id="fileSize"></span>
-                        </div>
-                    </div>
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <button class="btn btn-secondary" onclick="verifyFile()">✅ Verify</button>
-                        <button class="btn btn-primary" onclick="uploadFile()">🚀 Upload</button>
-                    </div>
-                </div>
-
-                <div class="mapping-section hidden" id="mappingSection">
-                    <div style="font-weight: 800; color: #1f2937;">Attribute Mapping</div>
-                    <div style="color: #6b7280; font-size: 0.9rem; margin-top: 6px;">
-                        Table attributes are fixed. Select the CSV column to map into each table attribute.
-                    </div>
-                    <div id="mappingRows"></div>
-                </div>
-
-                <div class="preview-card hidden" id="previewCard">
-                    <div style="display:flex; align-items:center; justify-content: space-between; gap: 10px;">
-                        <div>
-                            <div style="font-weight: 800; color: #1f2937;" id="previewTitle">Preview</div>
-                            <div style="color: #6b7280; font-size: 0.9rem; margin-top: 4px;">
-                                Showing <span id="previewRange">1-10</span>
-                                <span id="selectedCounter" class="selected-counter hidden">| <span
-                                        id="selectedCount">0</span> rows selected</span>
-                            </div>
-                        </div>
-                        <div style="display:flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end;">
-                            <button class="btn btn-secondary" id="previewToggleBtn"
-                                onclick="togglePreviewMode()">Matched</button>
-                            <button class="btn btn-secondary" onclick="selectAllRows()">Select All</button>
-                            <button class="btn btn-secondary" onclick="clearSelection()">Clear</button>
-                            <button class="btn btn-secondary" onclick="previewPrev()">-10</button>
-                            <button class="btn btn-secondary" onclick="previewNext()">+10</button>
-                        </div>
-                    </div>
-                    <div style="max-height: 280px; overflow: auto; border-radius: 10px;">
-                        <table class="preview-table" id="previewTable"></table>
-                    </div>
+            <div class="mapping-validation" id="mappingValidation">
+                <div class="validation-status" id="validationStatus">
+                    <span class="status-icon">⚠️</span>
+                    <span>No mappings configured</span>
                 </div>
             </div>
 
-            <div id="jobStatusSection" class="hidden"></div>
+            <div class="mapping-controls">
+                <button class="btn btn-secondary" onclick="clearAllMappings()">🗑️ Clear All</button>
+                <button class="btn btn-secondary" onclick="previewMapping()">👁️ Preview Result</button>
+            </div>
         </div>
 
-        <!-- Job Cards Container -->
-        <div id="jobCardsContainer" class="job-cards-container"></div>
-    </div>
+        <!-- CARD 6: Source/Matched Preview -->
+        <div class="card hidden" id="card-preview">
+            <div class="preview-tabs">
+                <button class="preview-tab active" onclick="setPreviewTab('source')" id="tabSource">📄 Source Preview</button>
+                <button class="preview-tab" onclick="setPreviewTab('matched')" id="tabMatched">✅ Matched Preview</button>
+            </div>
+
+            <!-- Source Preview Panel -->
+            <div id="sourcePreviewPanel" class="preview-panel active">
+                <div class="preview-controls">
+                    <div class="preview-stats-bar">
+                        <span id="sourcePreviewStats">Showing 1-10 of 0 rows</span>
+                        <span id="sourceSelectedStats">0 selected</span>
+                    </div>
+                    <div class="preview-buttons">
+                        <button class="btn btn-secondary" onclick="selectAllPreviewRows()">Select All</button>
+                        <button class="btn btn-secondary" onclick="clearPreviewSelection()">Clear</button>
+                        <button class="btn btn-secondary" onclick="previewPrev()">← Prev</button>
+                        <button class="btn btn-secondary" onclick="previewNext()">Next →</button>
+                    </div>
+                </div>
+                <div class="preview-table-container">
+                    <table class="preview-table" id="advancedPreviewTable"></table>
+                </div>
+            </div>
+
+            <!-- Matched Preview Panel -->
+            <div id="matchedPreviewPanel" class="preview-panel hidden">
+                <div class="preview-controls">
+                    <div class="preview-stats-bar">
+                        <span id="matchedPreviewStats">Showing matched data</span>
+                        <span class="match-badge" id="matchRate">0% matched</span>
+                    </div>
+                </div>
+                <div class="preview-table-container">
+                    <table class="preview-table" id="matchedPreviewTable"></table>
+                </div>
+            </div>
+
+            <div class="preview-actions-footer">
+                <button class="btn btn-primary btn-large" onclick="uploadToDatabase()" id="uploadBtn">
+                    🚀 Upload to Database
+                </button>
+            </div>
+        </div>
+
+        <!-- CARD 7: Uploads & Job Status with Search -->
+        <div class="card" id="card-uploads">
+            <div class="card-title" style="justify-content: space-between;">
+                <span>📤 Uploads & Job Status</span>
+                <button class="btn btn-secondary btn-sm" onclick="refreshRecentJobs()">🔄 Refresh</button>
+            </div>
+            
+            <!-- Job Search -->
+            <div class="job-search-section">
+                <div class="input-wrapper">
+                    <input type="text" id="jobSearchInput" placeholder="Search by Job ID..." onkeyup="searchJobs()">
+                    <button class="btn btn-secondary" onclick="searchJobs()">🔍 Search</button>
+                    <button class="btn btn-secondary" onclick="clearJobSearch()">Clear</button>
+                </div>
+                <div class="job-filters">
+                    <button class="filter-btn active" onclick="filterJobs('all')" id="filterAll">All</button>
+                    <button class="filter-btn" onclick="filterJobs('processing')" id="filterProcessing">Processing</button>
+                    <button class="filter-btn" onclick="filterJobs('completed')" id="filterCompleted">Completed</button>
+                    <button class="filter-btn" onclick="filterJobs('failed')" id="filterFailed">Failed</button>
+                </div>
+            </div>
+
+            <!-- Job Stats -->
+            <div class="job-stats-bar">
+                <div class="stat-item">
+                    <span class="stat-value" id="totalJobs">0</span>
+                    <span class="stat-label">Total</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="processingJobs">0</span>
+                    <span class="stat-label">Processing</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="completedJobs">0</span>
+                    <span class="stat-label">Completed</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="failedJobs">0</span>
+                    <span class="stat-label">Failed</span>
+                </div>
+            </div>
+
+            <!-- Job Cards Container -->
+            <div id="jobCardsContainer" class="job-cards-container">
+                <div class="empty-state" id="emptyJobsState">
+                    <div class="empty-icon">📭</div>
+                    <p>No active uploads</p>
+                    <p class="empty-subtitle">Upload data to see job status here</p>
+                </div>
+            </div>
+        </div>
 
     <script src="script.js"></script>
     <script src="track.js"></script>
