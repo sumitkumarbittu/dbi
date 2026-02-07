@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import psycopg
@@ -561,7 +561,7 @@ async def health():
 
 
 @app.post("/transfer/start")
-async def start_transfer(req: TransferStartRequest, background_tasks: BackgroundTasks):
+async def start_transfer(background_tasks: BackgroundTasks, req: TransferStartRequest = Body(...)):
     purge_jobs()
     job_id = generate_job_id()
     now = utc_now()

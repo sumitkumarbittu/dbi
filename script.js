@@ -1880,16 +1880,16 @@ async function startServerTransfer() {
     const chunkSize = Math.max(1, Math.min(100000, parseInt(chunkSizeRaw || '5000', 10) || 5000));
 
     const mapping = getActiveColumnMapping() || {};
-    const targetAttrs = tableSchema.attributes;
-    const mappedTargetCols = targetAttrs.filter(a => {
+    const targetAttrs = Array.isArray(tableSchema.attributes) ? tableSchema.attributes : [];
+    let mappedTargetCols = targetAttrs.filter(a => {
         const m = mapping[a];
         return m && m !== '' && m !== '__AUTO__';
     });
 
+    // If mapping UI hasn't been used yet (common when query isn't executed),
+    // default to identity mapping for all target attributes.
     if (mappedTargetCols.length === 0) {
-        showNotification('Please map at least one target attribute (Mapping card)', 'error');
-        scrollToCard('card-mapping');
-        return;
+        mappedTargetCols = targetAttrs.slice();
     }
 
     const payload = {
