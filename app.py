@@ -7,6 +7,7 @@ import io
 import re
 import os
 import random
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
 app = FastAPI()
@@ -52,6 +53,56 @@ def generate_job_id():
         if job_id not in JOBS:
             return job_id
     raise RuntimeError("Failed to generate unique job id")
+
+
+def utc_now():
+    return datetime.now(timezone.utc)
+
+
+def to_iso(dt: datetime | None):
+    return dt.isoformat() if dt else None
+
+
+def purge_jobs(retention: timedelta = timedelta(hours=2)):
+    now = utc_now()
+    to_delete = []
+    for job_id, job in JOBS.items():
+        status = job.get("status")
+        if status == "processing":
+            continue
+        finished_at_raw = job.get("finished_at")
+        try:
+            finished_at = datetime.fromisoformat(finished_at_raw) if finished_at_raw else None
+        except Exception:
+            finished_at = None
+
+        if not finished_at:
+            to_delete.append(job_id)
+            continue
+
+        if now - finished_at > retention:
+            to_delete.append(job_id)
+
+    for job_id in to_delete:
+        JOBS.pop(job_id, None)
+
+
+def job_public_view(job_id: str, job: dict):
+    return {
+        "job_id": job_id,
+        "status": job.get("status"),
+        "filename": job.get("filename"),
+        "label": job.get("label"),
+        "created_at": job.get("created_at"),
+        "updated_at": job.get("updated_at"),
+        "finished_at": job.get("finished_at"),
+        "rows_total": job.get("rows_total"),
+        "rows_inserted": job.get("rows_inserted"),
+        "rows_skipped": job.get("rows_skipped"),
+        "error": job.get("error"),
+        "progress": job.get("progress"),
+        "rows_processed": job.get("rows_processed"),
+    }
 
 
 def get_csv_header_columns(file_bytes: bytes):
@@ -279,15 +330,27 @@ async def process_upload(job_id, table, columns, pk_columns, file_bytes, filenam
         else:
             raise ValueError("Only CSV or JSON supported")
 
-        JOBS[job_id] = {
+        job = JOBS.get(job_id, {})
+        job.update({
             "status": "completed",
             "rows_total": total,
             "rows_inserted": inserted,
-            "rows_skipped": total - inserted
-        }
+            "rows_skipped": total - inserted,
+            "updated_at": to_iso(utc_now()),
+            "finished_at": to_iso(utc_now()),
+            "progress": 100,
+        })
+        JOBS[job_id] = job
 
     except Exception as e:
-        JOBS[job_id] = {"status": "failed", "error": str(e)}
+        job = JOBS.get(job_id, {})
+        job.update({
+            "status": "failed",
+            "error": str(e),
+            "updated_at": to_iso(utc_now()),
+            "finished_at": to_iso(utc_now()),
+        })
+        JOBS[job_id] = job
 
     finally:
         if conn:
@@ -373,8 +436,18 @@ async def upload_data(
     file_bytes = await file.read()
     filename = file.filename.lower()
 
+    purge_jobs()
     job_id = generate_job_id()
-    JOBS[job_id] = {"status": "processing"}
+    now = utc_now()
+    JOBS[job_id] = {
+        "status": "processing",
+        "created_at": to_iso(now),
+        "updated_at": to_iso(now),
+        "finished_at": None,
+        "filename": file.filename,
+        "label": f"Upload to {table}",
+        "progress": 0,
+    }
 
     background_tasks.add_task(
         process_upload,
@@ -391,10 +464,11 @@ async def upload_data(
 
 @app.get("/job-status/{job_id}")
 async def job_status(job_id: str):
+    purge_jobs()
     job = JOBS.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="job not found")
-    return job
+    return job_public_view(job_id, job)
 
 
 @app.get("/table-schema")
@@ -412,6 +486,7 @@ async def table_schema(table: str, schema: str = "public"):
 
 @app.get("/jobs/running")
 async def get_running_jobs():
+    purge_jobs()
     running_jobs = [
         {"job_id": job_id, "status": job["status"]}
         for job_id, job in JOBS.items()
@@ -421,6 +496,22 @@ async def get_running_jobs():
     return {
         "count": len(running_jobs),
         "jobs": running_jobs
+    }
+
+
+@app.get("/jobs/recent")
+async def get_recent_jobs(hours: int = 2):
+    # Keep completed/failed for 2 hours after finished, always keep processing.
+    purge_jobs(retention=timedelta(hours=hours))
+    jobs = [job_public_view(job_id, job) for job_id, job in JOBS.items()]
+
+    def sort_key(j):
+        return j.get("updated_at") or j.get("created_at") or ""
+
+    jobs.sort(key=sort_key, reverse=True)
+    return {
+        "count": len(jobs),
+        "jobs": jobs,
     }
 
 
