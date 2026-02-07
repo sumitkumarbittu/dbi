@@ -557,7 +557,7 @@ async def health():
 
 
 @app.post("/transfer/start")
-async def start_transfer(req: TransferStartRequest, background_tasks: BackgroundTasks):
+async def start_transfer(req: "TransferStartRequest", background_tasks: BackgroundTasks):
     purge_jobs()
     job_id = generate_job_id()
     now = utc_now()
