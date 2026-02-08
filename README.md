@@ -105,13 +105,23 @@ The service addresses common data import challenges by offering automatic primar
 
 4. **Set up environment variables**
    ```bash
-   export DATABASE_URL="postgresql://username:password@localhost:5432/dbname"
    export PORT=8000
+   export CORS_ALLOW_ORIGINS="*"
    ```
 
 5. **Run the application**
    ```bash
    python app.py
+   ```
+
+6. **Configure the target database**
+
+   DBI stores the target DB connection string in memory. Configure it after startup:
+
+   ```bash
+   curl -X POST http://localhost:8000/save-db \
+     -H "Content-Type: application/json" \
+     -d '{"database_url": "postgresql://user:pass@localhost:5432/db"}'
    ```
 
 ### Docker Deployment
@@ -124,8 +134,8 @@ The service addresses common data import challenges by offering automatic primar
 2. **Run the container**
    ```bash
    docker run -p 8000:8000 \
-     -e DATABASE_URL="postgresql://username:password@host:5432/dbname" \
      -e PORT=8000 \
+     -e CORS_ALLOW_ORIGINS="*" \
      dbi
    ```
 
@@ -133,19 +143,17 @@ The service addresses common data import challenges by offering automatic primar
 
 ### Render.com
 
-The project includes a pre-configured `render.yaml` for easy deployment on Render:
+This repo includes both `render.yaml` and `.render.yaml`. Use **one** in your Render setup depending on how you deploy.
 
-```bash
-# Connect your repository to Render
-# The service will automatically deploy using the render.yaml configuration
-```
+- `Dockerfile` runs `uvicorn app:app` and exposes `/health`.
+- After deploy, configure your target database by calling `POST /save-db` (see below). This value is stored in memory for the running instance.
 
 ### Environment Variables
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `DATABASE_URL` | PostgreSQL connection string | Yes |
 | `PORT` | Application port (default: 8000) | No |
+| `CORS_ALLOW_ORIGINS` | Comma-separated origins or `*` | No |
 
 ## 📡 API Documentation
 
@@ -341,7 +349,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ### Common Issues
 
 **Database Connection Failed**
-- Verify `DATABASE_URL` format and credentials
+- Verify the connection string you sent to `POST /save-db` is correct
 - Check network connectivity to PostgreSQL server
 - Ensure database exists and user has permissions
 
@@ -359,8 +367,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 Enable debug logging:
 ```bash
-export LOG_LEVEL=debug
-python app.py
+uvicorn app:app --host 0.0.0.0 --port 8000 --log-level debug
 ```
 
 ## 📞 Support

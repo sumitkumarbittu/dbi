@@ -145,13 +145,7 @@
                     <label>SQL Query</label>
                     <textarea id="sourceDbQuery" placeholder="SELECT * FROM users LIMIT 100;"></textarea>
                 </div>
-                <div class="button-group" style="display:flex; gap: 10px; flex-wrap: wrap; align-items:center;">
-                    <button class="btn btn-primary" onclick="executeSourceQuery()" id="executeQueryBtn" disabled>▶️ Execute Query</button>
-                    <div class="input-wrapper" style="max-width: 240px;">
-                        <input type="number" id="transferChunkSize" min="1" max="100000" value="5000" placeholder="Chunk size">
-                    </div>
-                    <button class="btn btn-secondary" onclick="startServerTransfer()" id="startTransferBtn" disabled>🚚 Server Transfer</button>
-                </div>
+                <button class="btn btn-primary" onclick="executeSourceQuery()" id="executeQueryBtn" disabled>▶️ Execute Query</button>
 
                 <!-- Advanced Query Results Preview -->
                 <div id="queryResultsSection" class="hidden advanced-preview-section">

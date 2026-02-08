@@ -1,8 +1,5 @@
-from __future__ import annotations
-
-from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, HTTPException, Body
+from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
 import psycopg
 import json
 import csv
@@ -18,11 +15,9 @@ app = FastAPI()
 # ----------------------------
 # CORS
 # ----------------------------
-_cors_origins_raw = os.getenv("CORS_ALLOW_ORIGINS", "*")
-_cors_origins = [o.strip() for o in _cors_origins_raw.split(",") if o.strip()] if _cors_origins_raw != "*" else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -560,63 +555,6 @@ async def health():
     return {"status": "ok"}
 
 
-@app.post("/transfer/start")
-async def start_transfer(background_tasks: BackgroundTasks, req: TransferStartRequest = Body(...)):
-    purge_jobs()
-    job_id = generate_job_id()
-    now = utc_now()
-
-    try:
-        validate_identifiers([req.target_table])
-        validate_identifiers(req.target_columns)
-        validate_identifiers(req.primary_key)
-        validate_identifiers(list(req.source_to_target_mapping.keys()))
-        validate_identifiers(list(req.source_to_target_mapping.values()))
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
-
-    JOBS[job_id] = {
-        "status": "processing",
-        "created_at": to_iso(now),
-        "updated_at": to_iso(now),
-        "finished_at": None,
-        "filename": None,
-        "label": f"Transfer to {req.target_table}",
-        "progress": 0,
-        "rows_processed": 0,
-        "rows_inserted": 0,
-        "cancel_requested": False,
-    }
-
-    background_tasks.add_task(
-        process_transfer_job,
-        job_id,
-        req.query,
-        req.target_table,
-        req.target_columns,
-        req.source_to_target_mapping,
-        req.primary_key,
-        req.chunk_size,
-        req.on_conflict_do_nothing,
-    )
-
-    return {"status": "accepted", "job_id": job_id}
-
-
-@app.post("/transfer/cancel/{job_id}")
-async def cancel_transfer(job_id: str):
-    purge_jobs()
-    job = JOBS.get(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="job not found")
-    if job.get("status") != "processing":
-        return {"status": "ignored", "job_id": job_id, "job_status": job.get("status")}
-    job["cancel_requested"] = True
-    job["updated_at"] = to_iso(utc_now())
-    JOBS[job_id] = job
-    return {"status": "ok", "job_id": job_id}
-
-
 # ============================
 # Source Database APIs
 # ============================
@@ -731,160 +669,6 @@ def mask_url(url: str) -> str:
         return f"{parsed.scheme}://{parsed.username}:***@{parsed.hostname}:{parsed.port or 5432}{parsed.path}"
     except:
         return url[:30] + "..." if len(url) > 30 else url
-
-
-class TransferStartRequest(BaseModel):
-    query: str = Field(..., min_length=1)
-    target_table: str = Field(..., min_length=1)
-    target_columns: list[str] = Field(..., min_length=1)
-    source_to_target_mapping: dict[str, str] = Field(default_factory=dict)
-    primary_key: list[str] = Field(default_factory=list)
-    chunk_size: int = Field(default=1000, ge=1, le=100_000)
-    on_conflict_do_nothing: bool = True
-
-
-def _job_mark(job_id: str, **updates):
-    job = JOBS.get(job_id, {})
-    job.update(updates)
-    job["updated_at"] = to_iso(utc_now())
-    JOBS[job_id] = job
-
-
-async def _ensure_db_urls():
-    if not SOURCE_DB_URL:
-        raise HTTPException(status_code=400, detail="Source database not configured")
-    if not TARGET_DB_URL:
-        raise HTTPException(status_code=400, detail="Target database not configured")
-
-
-async def process_transfer_job(
-    job_id: str,
-    query: str,
-    target_table: str,
-    target_columns: list[str],
-    mapping: dict[str, str],
-    pk_columns: list[str],
-    chunk_size: int,
-    on_conflict_do_nothing: bool,
-):
-    source_conn = None
-    target_conn = None
-    try:
-        await _ensure_db_urls()
-
-        source_conn = await psycopg.AsyncConnection.connect(SOURCE_DB_URL)
-        target_conn = await psycopg.AsyncConnection.connect(TARGET_DB_URL)
-
-        validate_identifiers([target_table])
-        validate_identifiers(target_columns)
-        validate_identifiers(pk_columns)
-        validate_identifiers(list(mapping.keys()))
-        validate_identifiers(list(mapping.values()))
-
-        requested_target_cols = list(target_columns)
-        effective_mapping = {c: mapping.get(c, c) for c in requested_target_cols}
-
-        placeholders = ", ".join(["%s"] * len(requested_target_cols))
-        cols_sql = ", ".join(requested_target_cols)
-
-        conflict_sql = ""
-        if on_conflict_do_nothing and pk_columns:
-            pk_sql = ", ".join(pk_columns)
-            conflict_sql = f" ON CONFLICT ({pk_sql}) DO NOTHING"
-
-        insert_sql = f"INSERT INTO {target_table} ({cols_sql}) VALUES ({placeholders}){conflict_sql}"
-
-        rows_processed = 0
-        rows_inserted = 0
-
-        async with target_conn.cursor() as _cur:
-            await _cur.execute("BEGIN")
-
-        async with source_conn.cursor() as s_cur:
-            await s_cur.execute(query)
-            source_cols = [d.name for d in (s_cur.description or [])]
-            source_idx = {name: i for i, name in enumerate(source_cols)}
-
-            missing = [
-                (t_col, s_col)
-                for t_col, s_col in effective_mapping.items()
-                if s_col not in source_idx
-            ]
-            if missing:
-                raise ValueError(
-                    "Source query is missing required column(s): "
-                    + ", ".join([f"{t}->{s}" for t, s in missing])
-                )
-
-            async with target_conn.cursor() as t_cur:
-                while True:
-                    job = JOBS.get(job_id) or {}
-                    if job.get("cancel_requested"):
-                        raise RuntimeError("cancel_requested")
-
-                    chunk = await s_cur.fetchmany(chunk_size)
-                    if not chunk:
-                        break
-
-                    payload = [
-                        tuple(row[source_idx[effective_mapping[col]]] for col in requested_target_cols)
-                        for row in chunk
-                    ]
-
-                    await t_cur.executemany(insert_sql, payload)
-                    rows_processed += len(payload)
-
-                    try:
-                        if t_cur.rowcount and t_cur.rowcount > 0:
-                            rows_inserted += t_cur.rowcount
-                    except Exception:
-                        pass
-
-                    _job_mark(
-                        job_id,
-                        rows_processed=rows_processed,
-                        rows_inserted=rows_inserted,
-                        progress=None,
-                    )
-
-        await target_conn.commit()
-
-        _job_mark(
-            job_id,
-            status="completed",
-            finished_at=to_iso(utc_now()),
-            rows_total=rows_processed,
-            rows_inserted=rows_inserted,
-            rows_skipped=(rows_processed - rows_inserted) if rows_inserted is not None else None,
-            progress=100,
-        )
-
-    except Exception as e:
-        if target_conn is not None:
-            try:
-                await target_conn.rollback()
-            except Exception:
-                pass
-
-        if str(e) == "cancel_requested":
-            _job_mark(
-                job_id,
-                status="canceled",
-                error="canceled",
-                finished_at=to_iso(utc_now()),
-            )
-        else:
-            _job_mark(
-                job_id,
-                status="failed",
-                error=str(e),
-                finished_at=to_iso(utc_now()),
-            )
-    finally:
-        if source_conn is not None and not source_conn.closed:
-            await source_conn.close()
-        if target_conn is not None and not target_conn.closed:
-            await target_conn.close()
 
 
 # ----------------------------

@@ -786,7 +786,6 @@ async function fetchTableSchema() {
             }
 
             showNotification('Schema loaded!', 'success');
-            updateTransferUiState();
             scrollToCard('card-data-source');
 
             // If we already have a loaded source (CSV/JSON/DB), refresh mapping UI for the new schema.
@@ -797,8 +796,6 @@ async function fetchTableSchema() {
             }
         } else {
             tableSchema = null;
-
-            updateTransferUiState();
 
             const schemaInfoEl = document.getElementById('schemaInfo');
             if (schemaInfoEl) schemaInfoEl.classList.add('hidden');
@@ -813,8 +810,6 @@ async function fetchTableSchema() {
         }
     } catch (err) {
         tableSchema = null;
-
-        updateTransferUiState();
 
         const schemaInfoEl = document.getElementById('schemaInfo');
         if (schemaInfoEl) schemaInfoEl.classList.add('hidden');
@@ -1681,13 +1676,6 @@ let sourceDbConnected = false;
 let queryResults = null;
 let queryColumns = [];
 
-function updateTransferUiState() {
-    const btn = document.getElementById('startTransferBtn');
-    if (!btn) return;
-    const schemaLoaded = !!(tableSchema && Array.isArray(tableSchema.attributes) && tableSchema.attributes.length > 0);
-    btn.disabled = !(sourceDbConnected && schemaLoaded);
-}
-
 function setSourceType(type) {
     currentSourceType = type;
 
@@ -1705,14 +1693,12 @@ function setSourceType(type) {
     if (currentDataSource && currentDataSource.type !== type) {
         currentDataSource = null;
     }
-
-    updateTransferUiState();
 }
 
 // ============================
 // DB Source Functions
 // ============================
-async function connectSourceDb(event) {
+async function connectSourceDb(evt) {
     const inputEl = document.getElementById('sourceDbUrl');
     const url = (inputEl?.value?.trim() || currentSourceDbUrl || '').trim();
     if (!url) {
@@ -1720,7 +1706,7 @@ async function connectSourceDb(event) {
         return;
     }
 
-    const connectBtn = (event && event.target) ? event.target : document.getElementById('connectSourceDbBtn');
+    const connectBtn = (evt && evt.target) ? evt.target : document.getElementById('connectSourceDbBtn');
     if (!connectBtn) {
         showNotification('Connect button not found', 'error');
         return;
@@ -1749,7 +1735,6 @@ async function connectSourceDb(event) {
             document.getElementById('sourceDbStatus').classList.remove('hidden');
             document.getElementById('sourceDbStatusText').textContent = `Connected: ${data.database_url}`;
             document.getElementById('executeQueryBtn').disabled = false;
-            updateTransferUiState();
             currentSourceDbUrl = url;
             try {
                 localStorage.setItem('sourceDbUrl', url);
@@ -1765,7 +1750,6 @@ async function connectSourceDb(event) {
             sourceDbConnected = false;
             document.getElementById('sourceDbStatus').classList.add('hidden');
             document.getElementById('executeQueryBtn').disabled = true;
-            updateTransferUiState();
             showNotification('Error: ' + errorToString(data.detail), 'error');
         }
     } catch (err) {
@@ -1775,7 +1759,6 @@ async function connectSourceDb(event) {
         sourceDbConnected = false;
         document.getElementById('sourceDbStatus').classList.add('hidden');
         document.getElementById('executeQueryBtn').disabled = true;
-        updateTransferUiState();
 
         let errorMsg = 'Network Error: ' + err.message;
         if (isFileProtocol()) {
@@ -1856,85 +1839,6 @@ async function executeSourceQuery() {
     } finally {
         executeBtn.disabled = false;
         executeBtn.textContent = '▶️ Execute Query';
-    }
-}
-
-async function startServerTransfer() {
-    if (!sourceDbConnected) {
-        showNotification('Please connect to source database first', 'error');
-        return;
-    }
-    if (!tableSchema || !Array.isArray(tableSchema.attributes) || tableSchema.attributes.length === 0) {
-        showNotification('Load Target Table Schema first (above)', 'error');
-        scrollToCard('card-table-schema');
-        return;
-    }
-
-    const query = document.getElementById('sourceDbQuery')?.value?.trim();
-    if (!query) {
-        showNotification('Please enter a SQL query', 'error');
-        return;
-    }
-
-    const chunkSizeRaw = document.getElementById('transferChunkSize')?.value;
-    const chunkSize = Math.max(1, Math.min(100000, parseInt(chunkSizeRaw || '5000', 10) || 5000));
-
-    const mapping = getActiveColumnMapping() || {};
-    const targetAttrs = Array.isArray(tableSchema.attributes) ? tableSchema.attributes : [];
-    let mappedTargetCols = targetAttrs.filter(a => {
-        const m = mapping[a];
-        return m && m !== '' && m !== '__AUTO__';
-    });
-
-    // If mapping UI hasn't been used yet (common when query isn't executed),
-    // default to identity mapping for all target attributes.
-    if (mappedTargetCols.length === 0) {
-        mappedTargetCols = targetAttrs.slice();
-    }
-
-    const payload = {
-        query,
-        target_table: tableSchema.table,
-        target_columns: mappedTargetCols,
-        source_to_target_mapping: Object.fromEntries(mappedTargetCols.map(t => [t, mapping[t] || t])),
-        primary_key: Array.isArray(tableSchema.primary_key) ? tableSchema.primary_key : [],
-        chunk_size: chunkSize,
-        on_conflict_do_nothing: true
-    };
-
-    const btn = document.getElementById('startTransferBtn');
-    if (btn) {
-        btn.disabled = true;
-        btn.textContent = '⏳ Starting...';
-    }
-
-    try {
-        const transferUrl = `${renderApiUrl}/transfer/start`;
-        const res = await fetch(transferUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-        if (res.ok) {
-            showNotification('Transfer started!', 'info');
-            createJobCard(data.job_id, `Server Transfer → ${tableSchema.table}`);
-            monitorJobCard(data.job_id);
-            scrollToCard('card-uploads');
-        } else {
-            if (res.status === 404) {
-                showNotification(`Error 404: ${transferUrl} not found. Wrong API base selected or backend not redeployed.`, 'error');
-            } else {
-                showNotification(`Error ${res.status}: ` + errorToString(data.detail), 'error');
-            }
-        }
-    } catch (err) {
-        showNotification('Error: ' + err.message, 'error');
-    } finally {
-        if (btn) {
-            btn.disabled = false;
-            btn.textContent = '🚚 Server Transfer';
-        }
     }
 }
 
